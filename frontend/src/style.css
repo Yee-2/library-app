@@ -1,0 +1,64 @@
+/* 全局样式 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f8fafc;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* 阅读器样式变量（由 JS 动态注入） */
+.reader-area {
+  font-size: var(--reader-font-size, 18px);
+  line-height: var(--reader-line-height, 1.8);
+  font-family: var(--reader-font-family, system-ui);
+  color: var(--reader-color, #1f2937);
+  background: var(--reader-bg, #ffffff);
+  max-width: var(--reader-max-width, 720px);
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.reader-area p { margin: 0 0 1em; text-indent: 2em; }
+.reader-area h1, .reader-area h2, .reader-area h3 {
+  text-indent: 0;
+  font-weight: 600;
+  margin: 1.2em 0 0.6em;
+}
+
+/* 笔记高亮 */
+.reader-highlight {
+  background: var(--hl-color, #fef3c7);
+  cursor: pointer;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* 路由过渡 */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* 按钮统一基类 */
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed select-none; }
+  .btn-primary { @apply btn bg-brand-500 text-white hover:bg-brand-600; }
+  .btn-secondary { @apply btn bg-slate-100 text-slate-700 hover:bg-slate-200; }
+  .btn-ghost { @apply btn text-slate-600 hover:bg-slate-100; }
+  .btn-danger { @apply btn bg-red-500 text-white hover:bg-red-600; }
+  .input { @apply w-full px-3 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent placeholder:text-slate-400 text-sm; }
+  .card { @apply bg-white rounded-xl shadow-sm border border-slate-200; }
+}
