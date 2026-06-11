@@ -53,15 +53,34 @@ body {
   min-height: 100%;
 }
 
-/* 翻页式阅读器（txt/pdf）—— 背景铺满，内容可滚动 */
+/* 翻页式阅读器（txt/pdf）—— 禁止滚动，背景铺满 */
 .reader-scroller-paged {
-  overflow: auto;
+  overflow: hidden !important;
   background: var(--reader-bg, #ffffff);
   transition: background 0.2s;
 }
 .reader-scroller-paged .reader-area {
-  min-height: 100%;
-  overflow: visible;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 翻页动画（txt/pdf 左右滑动） */
+.page-turn {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+.page-turn-next {
+  animation: slideInFromRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.page-turn-prev {
+  animation: slideInFromLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes slideInFromRight {
+  from { transform: translateX(30%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes slideInFromLeft {
+  from { transform: translateX(-30%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
 }
 
 /* 笔记高亮 */
