@@ -52,22 +52,29 @@ export async function uploadBook(file: File, meta: {
     }
   }
 
-  const { data, error } = await supabase
-    .from('books')
-    .insert({
-      user_id: user.id,
-      title: meta.title.trim() || file.name.replace(/\.[^.]+$/, ''),
-      author: meta.author?.trim() || null,
-      description: meta.description?.trim() || null,
-      cover_url: coverUrl,
-      file_url: filePath,
-      file_format: format,
-      file_size: file.size,
-      is_public: !!meta.isPublic,
-      original_filename: file.name,
-    })
-    .select()
-    .single()
+  const row: Record<string, any> = {
+    user_id: user.id,
+    title: meta.title.trim() || file.name.replace(/\.[^.]+$/, ''),
+    author: meta.author?.trim() || null,
+    description: meta.description?.trim() || null,
+    cover_url: coverUrl,
+    file_url: filePath,
+    file_format: format,
+    file_size: file.size,
+    is_public: !!meta.isPublic,
+    original_filename: file.name,
+  }
+
+  let data: any = null
+  let error: any = null
+  ;({ data, error } = await supabase.from('books').insert(row).select().single())
+
+  // 兼容：006 迁移未跑时 original_filename 列还不存在 → 降级不带该字段再试一次
+  if (error && /original_filename.*does not exist/i.test(error.message ?? '')) {
+    delete row.original_filename
+    ;({ data, error } = await supabase.from('books').insert(row).select().single())
+  }
+
   if (error) throw error
   return data as Book
 }
