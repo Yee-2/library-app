@@ -234,13 +234,11 @@ function readBook(b: Book | string) {
               <label class="text-xs font-medium text-slate-600 mb-1.5 block">封面图（可选）</label>
               <input type="file" accept="image/*" @change="onCoverPick" class="block w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100" />
             </div>
-            <label class="flex items-center gap-3 cursor-pointer">
-              <span class="relative inline-block">
-                <input type="checkbox" v-model="isPublic" class="peer sr-only" />
-                <span class="w-9 h-5 rounded-full bg-slate-200 peer-checked:bg-brand-500 transition relative
-                              after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4
-                              after:bg-white after:rounded-full after:shadow after:transition-transform
-                              peer-checked:after:translate-x-4"></span>
+            <label class="flex items-center gap-3 cursor-pointer select-none">
+              <span class="relative inline-flex items-center">
+                <input type="checkbox" v-model="isPublic" class="sr-only peer" />
+                <span class="w-10 h-6 rounded-full bg-slate-200 peer-checked:bg-brand-500 transition-colors pointer-events-none"></span>
+                <span class="absolute left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform pointer-events-none peer-checked:translate-x-4"></span>
               </span>
               <span class="text-sm text-slate-700 flex-1">上传到公开书库（其他用户可下载）</span>
               <Globe class="w-4 h-4 text-slate-400" :stroke-width="1.75" />

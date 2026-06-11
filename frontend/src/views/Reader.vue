@@ -293,19 +293,18 @@ async function renderEpub() {
   }
 
   // epubjs: ePub(urlOrData) 接受 string 或 ArrayBuffer
-  const book: any = ePub(bookInput)
-  epubBook = book
+  const epubJsBook: any = ePub(bookInput)
+  epubBook = epubJsBook
 
-  // 关键配置：continuous + allowScriptedContent
-  // allowScriptedContent 恢复 iframe sandbox 中的 allow-scripts（否则 JS 脚本被阻止）
-  // locations.generate 已移到 display() 之后异步执行，不会破坏 layout
-  const rendition: any = book.renderTo(readerRef.value, {
+  // 关键配置：flow: 'scrolled-doc' + manager: 'continuous'
+  // 实现类似微信读书的纵向滚动阅读（不翻页，上下滑动）
+  // allowScriptedContent 允许 epub 内的 JS（MathJax 等）
+  const rendition: any = epubJsBook.renderTo(readerRef.value, {
     width: '100%',
     height: '100%',
     spread: 'none',
-    flow: 'paginated',
+    flow: 'scrolled-doc',
     manager: 'continuous',
-    snap: true,
     allowScriptedContent: true,
   })
   epubRendition = rendition
@@ -313,8 +312,8 @@ async function renderEpub() {
   // 字号（epubjs 官方推荐用法）
   rendition.themes.fontSize(`${reader.fontSize}px`)
 
-  book.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
-  book.on?.('closed', () => console.log('[reader] book closed'))
+  epubJsBook.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
+  epubJsBook.on?.('closed', () => console.log('[reader] book closed'))
   rendition.on?.('relocated', (loc: any) => console.log('[reader] relocated ->', loc?.start?.index, loc?.start?.href))
 
   // 翻页：键盘左右 / 触摸
@@ -322,10 +321,19 @@ async function renderEpub() {
   if (epubKeyHandler) window.removeEventListener('keydown', epubKeyHandler)
   epubKeyHandler = (e: KeyboardEvent) => {
     if (!epubRendition) return
-    if (e.key === 'ArrowLeft' || e.key === 'PageUp')  epubRendition.prev()
-    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') epubRendition.next()
+    // scrolled-doc 模式：键盘翻页用滚动
+    const scrollEl = epubRendition.manager?.container
+    const pageHeight = (scrollEl?.clientHeight || window.innerHeight) * 0.85
+    if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      scrollEl?.scrollBy({ top: -pageHeight, behavior: 'smooth' })
+      e.preventDefault()
+    }
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+      scrollEl?.scrollBy({ top: pageHeight, behavior: 'smooth' })
+      e.preventDefault()
+    }
   }
-  window.addEventListener('keydown', epubKeyHandler, { passive: true })
+  window.addEventListener('keydown', epubKeyHandler, { passive: false })
 
   if (readerRef.value) {
     // 先清理可能残留的旧监听器（防止 re-render 堆积）
@@ -338,35 +346,16 @@ async function renderEpub() {
     }
     touchEndHandler = (e: TouchEvent) => {
       if (isSwiping) return  // 防抖：300ms 内忽略
-      if (!epubRendition) return
+      // epub 用 scrolled-doc 模式，原生滚动，不处理触摸
+      if (book.value?.file_format === 'epub') return
       const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX
-      const dy = (e.changedTouches[0]?.clientY ?? 0) - touchStartY
-      const format = book.value?.file_format
       try {
-        if (format === 'epub') {
-          // 水平滑动占主导才翻页，避免和垂直滚动冲突
-          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-            isSwiping = true
-            setTimeout(() => { isSwiping = false }, 300)
-            if (dx < -40) epubRendition.next()
-            else if (dx > 40) epubRendition.prev()
-          } else if (Math.abs(dx) < 40) {
-            // 点击：左半屏 prev，右半屏 next
-            const x = e.changedTouches[0]?.clientX ?? 0
-            const w = readerRef.value?.clientWidth ?? 0
-            isSwiping = true
-            setTimeout(() => { isSwiping = false }, 300)
-            if (x < w / 2) epubRendition.prev()
-            else epubRendition.next()
-          }
-        } else {
-          // txt / pdf：左右滑翻页
-          if (Math.abs(dx) > 40) {
-            isSwiping = true
-            setTimeout(() => { isSwiping = false }, 300)
-            if (dx < -40) nextPage()
-            else if (dx > 40) prevPage()
-          }
+        // txt / pdf：左右滑翻页
+        if (Math.abs(dx) > 40) {
+          isSwiping = true
+          setTimeout(() => { isSwiping = false }, 300)
+          if (dx < -40) nextPage()
+          else if (dx > 40) prevPage()
         }
       } catch (err) {
         console.error('[reader] swipe error', err)
@@ -378,7 +367,7 @@ async function renderEpub() {
 
   try {
     await Promise.race([
-      book.ready,
+      epubJsBook.ready,
       new Promise((_, rej) => setTimeout(() => rej(new Error('book.ready timeout 15s')), 15000)),
     ])
   } catch (e) {
@@ -393,10 +382,21 @@ async function renderEpub() {
     console.error('[reader] display error', e)
   }
 
+  // scrolled-doc 模式下，用滚动位置计算进度
+  const scrollEl = rendition.manager?.container || readerRef.value
+  if (scrollEl) {
+    scrollEl.addEventListener('scroll', () => {
+      const scrollTop = scrollEl.scrollTop
+      const scrollHeight = scrollEl.scrollHeight - scrollEl.clientHeight
+      if (scrollHeight > 0) {
+        progressPct.value = Math.round((scrollTop / scrollHeight) * 100)
+      }
+    }, { passive: true })
+  }
+
   // 异步生成 location（不 await，不阻塞 display）
-  // 注意：必须在 display() 之后调用，否则会破坏 layout 导致 view 高度变 0
-  book.locations.generate(1024).then(() => {
-    console.log('[reader] locations generated, total =', book.locations.length?.())
+  epubJsBook.locations.generate(1024).then(() => {
+    console.log('[reader] locations generated, total =', epubJsBook.locations.length?.())
   }).catch((e: any) => {
     console.warn('[reader] locations.generate failed', e)
   })
@@ -408,7 +408,7 @@ async function renderEpub() {
 
   // 目录：从 epub 取 navigation.toc
   try {
-    const toc = book.navigation?.toc || []
+    const toc = epubJsBook.navigation?.toc || []
     chapters.value = (toc || []).map((item: any) => ({
       id: item.id || item.href || '',
       label: item.label || '(无标题)',
@@ -419,8 +419,8 @@ async function renderEpub() {
     console.error('[reader] toc failed', e)
   }
   rendition.on('relocated', (loc: any) => {
-    const pct = book.locations?.percentageFromCfi?.(loc.start.cfi)
-    progressPct.value = (typeof pct === 'number' ? pct : 0) * 100
+    console.log('[reader] relocated ->', loc?.start?.index, loc?.start?.href)
+    // 进度由滚动监听器更新，这里只保存书签位置
     scheduleSaveProgress(loc.start.cfi)
   })
   rendition.on('selected', (cfiRange: string, contents: any) => {

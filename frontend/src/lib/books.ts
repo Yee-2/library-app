@@ -461,6 +461,7 @@ export interface CommunityPost {
   user_id: string
   content: string
   book_id: string | null
+  image_url: string | null
   created_at: string
   updated_at: string
   profiles?: { username: string | null; avatar_url: string | null } | null
@@ -470,13 +471,14 @@ export interface CommunityPost {
 }
 
 /** 发布社区帖子 */
-export async function createPost(content: string, bookId?: string | null): Promise<CommunityPost> {
+export async function createPost(content: string, bookId?: string | null, imageUrl?: string | null): Promise<CommunityPost> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('未登录')
   const trimmed = content.trim()
-  if (!trimmed) throw new Error('内容不能为空')
+  if (!trimmed && !imageUrl) throw new Error('内容不能为空')
   if (trimmed.length > 2000) throw new Error('内容不能超过 2000 字')
-  const row = { user_id: user.id, content: trimmed, book_id: bookId || null }
+  const row: Record<string, any> = { user_id: user.id, content: trimmed || '', book_id: bookId || null }
+  if (imageUrl) row.image_url = imageUrl
   const { data, error } = await supabase
     .from('community_posts')
     .insert(row)
