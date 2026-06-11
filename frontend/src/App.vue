@@ -5,6 +5,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useAchievementsStore } from '@/stores/achievements'
 import TabBar from '@/components/TabBar.vue'
 import AchievementToast from '@/components/AchievementToast.vue'
+import { SpeedInsights } from '@vercel/speed-insights/vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -99,6 +100,9 @@ onMounted(async () => {
 
     <!-- 全局成就提示 -->
     <AchievementToast />
+
+    <!-- Vercel Speed Insights -->
+    <SpeedInsights />
 
     <footer v-if="!showTabBar" class="border-t border-slate-200 py-4 text-center text-xs text-slate-400">
       © {{ new Date().getFullYear() }} 云端图书馆 · Powered by Supabase + Vercel
