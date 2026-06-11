@@ -320,12 +320,14 @@ async function renderEpub() {
   epubBook = epubJsBook
 
   // 关键配置：flow: 'paginated' 左右翻页（不要 manager: 'continuous'，会导致高度为 0）
+  // allowScriptedContent 允许 epub 内的 JS（否则 iframe sandbox 阻止脚本执行）
   const rendition: any = epubJsBook.renderTo(readerRef.value, {
     width: '100%',
     height: '100%',
     spread: 'none',
     flow: 'paginated',
     snap: true,
+    allowScriptedContent: true,
   })
   epubRendition = rendition
 
