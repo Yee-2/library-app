@@ -56,11 +56,15 @@ git push -u origin main
 ### 2.2 执行 SQL 建表
 
 1. 左侧菜单 → SQL Editor → New query
-2. 依次执行 `supabase/migrations/` 目录里的**四个**文件（按编号顺序）：
+2. 依次执行 `supabase/migrations/` 目录里的**全部**文件（按编号顺序）：
    - `001_init.sql` — 创建表 + RLS 策略
    - `002_storage.sql` — 创建存储桶 + 存储策略
    - `003_increment_download.sql` — 下载计数函数
    - `004_books_profiles_fk.sql` — 补 books→profiles 外键（让公开书库能关联用户名）
+   - `005_phase2_3.sql` — 阅读统计 / 关注 / 社区 / 成就 / 全文搜索
+   - `006_storage_key_ascii.sql` — original_filename（中文 key 修复）
+   - `007_add_profiles_fk.sql` — 所有 user_id 列到 profiles 的 FK
+   - `008_drop_duplicate_auth_fk.sql` — 移除冗余 auth.users FK（解决 PGRST201）
 3. 每个文件打开后点 "Run"，显示 "Success" 再执行下一个
 
 ### 2.3 关闭邮箱验证（推荐，开发体验更好）
