@@ -136,17 +136,31 @@ function escapeHtml(s: string) {
 }
 
 let epubBook: any = null
+let epubRendition: any = null
 async function renderEpub() {
   // 动态导入 epubjs
   const ePub = (await import('epubjs')).default
-  if (epubBook) {
-    try { epubBook.destroy() } catch {}
+  if (epubRendition) {
+    try { epubRendition.destroy() } catch {}
+    epubRendition = null
     epubBook = null
   }
-  readerRef.value!.innerHTML = ''
-  const rendition: any = ePub(fileUrl.value)
-  epubBook = rendition
-  rendition.attachTo(readerRef.value!)
+  if (!readerRef.value) return
+  readerRef.value.innerHTML = ''
+
+  // epubjs: ePub(url) 返回的是 Book，必须 .renderTo(el) 拿 Rendition 才会渲染
+  const book: any = ePub(fileUrl.value)
+  epubBook = book
+  const rendition: any = book.renderTo(readerRef.value, {
+    width: '100%',
+    height: '100%',
+    spread: 'none',
+    manager: 'default',
+  })
+  epubRendition = rendition
+
+  // 等 book ready 再 display —— 否则 saved.cfi 可能命中不到内容
+  await book.ready
   const saved = await getProgress(bookId.value)
   await rendition.display(saved?.cfi || undefined)
   // 应用偏好样式
@@ -154,7 +168,7 @@ async function renderEpub() {
     const css = `
       body { font-family: ${reader.font().family} !important;
              font-size: ${reader.fontSize}px !important;
-             line-height: ${reader.lineHeight} !important;
+             line-height: ${reader.lineHeight}px !important;
              color: ${reader.theme().color} !important;
              background: ${reader.theme().bg} !important; }
       a { color: inherit; }
@@ -162,7 +176,8 @@ async function renderEpub() {
     contents.document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`)
   })
   rendition.on('relocated', (loc: any) => {
-    progressPct.value = (rendition.book?.locations?.percentageFromCfi(loc.start.cfi) || 0) * 100
+    const pct = book.locations?.percentageFromCfi?.(loc.start.cfi)
+    progressPct.value = (typeof pct === 'number' ? pct : 0) * 100
     scheduleSaveProgress(loc.start.cfi)
   })
   rendition.on('selected', (cfiRange: string, contents: any) => {
@@ -259,6 +274,7 @@ function scheduleSaveProgress(cfi?: string, page?: number) {
 }
 
 onBeforeUnmount(() => {
+  if (epubRendition) { try { epubRendition.destroy() } catch {} }
   if (epubBook) { try { epubBook.destroy() } catch {} }
   stopTTS()
 })
@@ -266,7 +282,7 @@ onBeforeUnmount(() => {
 // =============== 偏好应用 ===============
 watch([() => reader.fontId, () => reader.fontSize, () => reader.lineHeight, () => reader.themeId, () => reader.maxWidth], () => {
   if (readerRef.value) reader.applyTo(readerRef.value)
-  if (epubBook && book.value?.file_format === 'epub') {
+  if (epubRendition && book.value?.file_format === 'epub') {
     // 重新应用 epub 样式
     renderEpub()
   }
@@ -278,10 +294,10 @@ async function startTTS() {
   if (book.value?.file_format === 'txt') {
     const start = txtPage.value * txtPageSize
     text = txtContent.value.slice(start, start + txtPageSize)
-  } else if (book.value?.file_format === 'epub' && epubBook) {
+  } else if (book.value?.file_format === 'epub' && epubRendition) {
     // 取当前章节
     try {
-      const contents = epubBook.book.transport?.get?.('current')?.contents
+      const contents = epubRendition.book.transport?.get?.('current')?.contents
       if (contents) {
         text = (contents.window.document.body.textContent || '').slice(0, 5000)
       } else {
@@ -356,8 +372,8 @@ function stopTTS() {
 // =============== 书签 ===============
 async function addCurrentBookmark() {
   if (!book.value) return
-  const cfi = book.value.file_format === 'epub' && epubBook?.currentLocation
-    ? epubBook.currentLocation().start.cfi
+  const cfi = book.value.file_format === 'epub' && epubRendition?.currentLocation
+    ? epubRendition.currentLocation().start.cfi
     : null
   const page = book.value.file_format !== 'epub'
     ? (txtPage.value + 1)
@@ -368,8 +384,8 @@ async function addCurrentBookmark() {
 }
 
 async function gotoBookmark(b: Bookmark) {
-  if (b.cfi && epubBook) {
-    await epubBook.display(b.cfi)
+  if (b.cfi && epubRendition) {
+    await epubRendition.display(b.cfi)
   } else if (b.page && book.value?.file_format === 'txt') {
     txtPage.value = b.page - 1
     applyTxtPage()
@@ -392,7 +408,7 @@ async function addNoteManual() {
   if (!newNoteText.value.trim()) return
   const n = await addNote({
     book_id: bookId.value,
-    cfi: epubBook?.currentLocation?.()?.start?.cfi ?? null,
+    cfi: epubRendition?.currentLocation?.()?.start?.cfi ?? null,
     page: book.value?.file_format !== 'epub' ? (txtPage.value + 1) : null,
     content: newNoteText.value.trim(),
     comment: null,
