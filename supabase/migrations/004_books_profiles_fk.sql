@@ -13,7 +13,10 @@ left join public.profiles p on p.id = au.id
 where p.id is null
 on conflict (id) do nothing;
 
--- 2. 添加 books -> profiles 外键
+-- 2. 添加 books -> profiles 外键（幂等：先清掉旧的同名约束）
+alter table public.books
+drop constraint if exists books_user_id_profiles_fkey;
+
 alter table public.books
 add constraint books_user_id_profiles_fkey
 foreign key (user_id) references public.profiles(id) on delete cascade;
