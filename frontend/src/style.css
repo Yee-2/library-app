@@ -44,6 +44,13 @@ body {
 .reader-scroller {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
+  height: 100%;
+  min-height: 0;
+}
+.reader-scroller > .reader-area,
+.reader-scroller > div[ref="readerRef"] {
+  height: 100%;
+  min-height: 100%;
 }
 
 /* 翻页式阅读器（txt/pdf）—— 禁止垂直滚动，背景铺满整页 */

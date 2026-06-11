@@ -264,6 +264,20 @@ async function renderEpub() {
   if (!readerRef.value) return
   readerRef.value.innerHTML = ''
 
+  // 强制给容器和父容器设置高度 —— flex 子项 height: 100% 必须父级有明确高度
+  // 否则 epubjs 渲染时容器为 0 高度，导致内容看不到
+  const parent = readerRef.value.parentElement
+  if (parent) {
+    const ph = parent.clientHeight
+    if (ph < 100) {
+      // 父容器还没拿到高度（异步 layout），用 viewport 兜底
+      parent.style.height = `${window.innerHeight - 120}px`
+    }
+    parent.style.minHeight = '480px'
+  }
+  readerRef.value.style.height = '100%'
+  readerRef.value.style.width = '100%'
+
   // 直接把 epub 作为 ArrayBuffer 喂给 epubjs，避开：
   //   1) signedUrl 经过 CDN 后 Content-Type 错乱
   //   2) blob: URL 走 epubjs 内部的 XHR 失败（0.3.93 已知问题：Cannot load book at blob:...）
@@ -399,9 +413,15 @@ async function renderEpub() {
     console.warn('[reader] locations.generate failed (EPUB 可能没流式内容)', e)
   }
 
+  // locations.generate 会改变布局，必须 resize + 重新 display
+  try { rendition.resize() } catch (e) { console.warn('[reader] resize failed', e) }
+  await new Promise(r => requestAnimationFrame(r))
+  try { rendition.resize() } catch {}
+
   const saved = await getProgress(bookId.value)
   try {
     await rendition.display(saved?.cfi || undefined)
+    console.log('[reader] display done')
   } catch (e) {
     console.error('[reader] display error', e)
   }
