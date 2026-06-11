@@ -108,8 +108,16 @@ async function renderReader() {
 }
 
 async function renderTxt() {
+  // fetch 二进制再按 UTF-8 解码，避免 signedUrl 错误 Content-Type 导致
+  // res.text() 拿到空 / 乱码（控制台不报错但页面空白）
   const res = await fetch(fileUrl.value)
-  const text = await res.text()
+  if (!res.ok) {
+    error.value = '下载失败：HTTP ' + res.status
+    return
+  }
+  const buf = await res.arrayBuffer()
+  const text = new TextDecoder('utf-8', { fatal: false }).decode(buf)
+  console.debug('[reader] txt decoded length =', text.length, 'bytes =', buf.byteLength)
   txtContent.value = text
   txtTotalPages.value = Math.max(1, Math.ceil(text.length / txtPageSize))
   const prog = await getProgress(bookId.value)
