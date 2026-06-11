@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onActivated } from 'vue'
 import { listAllAchievements, listMyAchievements } from '@/lib/books'
-import { useAchievementsStore } from '@/stores/achievements'
 
-const ach = useAchievementsStore()
 const items = ref<any[]>([])
 const mine = ref<any[]>([])
 const loading = ref(false)
@@ -11,7 +9,6 @@ const loading = ref(false)
 async function refresh() {
   loading.value = true
   try {
-    await ach.init()
     items.value = await listAllAchievements()
     mine.value = await listMyAchievements()
   } finally {
