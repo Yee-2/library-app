@@ -377,7 +377,7 @@ async function renderEpub() {
     chapters.value = (toc || []).map((item: any) => ({
       id: item.id || item.href || '',
       label: item.label || '(无标题)',
-      cfi: item.href || item.cfi || undefined,
+      cfi: item.href || undefined,
     }))
     console.log('[reader] epub chapters =', chapters.value.length)
   } catch (e) {
@@ -669,6 +669,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <div v-if="loading" class="flex-1 flex items-center justify-center text-slate-500">加载中…</div>
     <div v-else-if="error" class="flex-1 flex items-center justify-center text-red-500">{{ error }}</div>
     <div v-else class="flex-1 overflow-auto" @click="(e) => {
+      // 点击翻页（txt + epub + pdf）：
+      //   左 1/3 → 上一页，右 2/3 → 下一页
+      //   宽屏（≥768px）点击不翻页（留给 PC 鼠标选中/滚动）
       const x = e.offsetX; const w = (e.currentTarget as HTMLElement).clientWidth
       if (w < 768) {
         if (x < w / 3) prevPage()
