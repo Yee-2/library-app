@@ -80,9 +80,12 @@ export async function uploadBook(file: File, meta: {
 }
 
 export async function listMyBooks() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
   const { data, error } = await supabase
     .from('books')
     .select('*')
+    .eq('user_id', user.id)
     .order('updated_at', { ascending: false })
   if (error) throw error
   return data as Book[]

@@ -192,9 +192,6 @@ function applyTxtPage() {
     .split(/\n\s*\n/)
     .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
     .join('')
-  // 滚回顶部，避免从中间进入新一页还显示之前滚动位置
-  const scroller = (readerRef.value.parentElement as HTMLElement) || readerRef.value
-  if (scroller) scroller.scrollTop = 0
   progressPct.value = ((txtPage.value + 1) / txtTotalPages.value) * 100
   scheduleSaveProgress()
 }
@@ -321,21 +318,31 @@ async function renderEpub() {
 
   if (readerRef.value) {
     let touchStartX = 0
+    let touchStartY = 0
     readerRef.value.addEventListener('touchstart', (e) => {
       touchStartX = e.changedTouches[0]?.clientX ?? 0
+      touchStartY = e.changedTouches[0]?.clientY ?? 0
     }, { passive: true })
     readerRef.value.addEventListener('touchend', (e) => {
-      if (!epubRendition) return
-      const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX
-      if (Math.abs(dx) < 40) {
-        const x = e.changedTouches[0]?.clientX ?? 0
-        const w = readerRef.value?.clientWidth ?? 0
-        if (x < w / 2) epubRendition.prev(); else epubRendition.next()
-      } else if (dx < -40) {
-        epubRendition.next()
-      } else if (dx > 40) {
-        epubRendition.prev()
+      if (book.value?.file_format === 'epub' && epubRendition) {
+        const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX
+        const dy = (e.changedTouches[0]?.clientY ?? 0) - touchStartY
+        // 只在水平滑动占主导时才翻页，避免与垂直滚动冲突
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+          if (dx < -40) epubRendition.next()
+          else if (dx > 40) epubRendition.prev()
+        } else if (Math.abs(dx) < 40) {
+          // 点击
+          const x = e.changedTouches[0]?.clientX ?? 0
+          const w = readerRef.value?.clientWidth ?? 0
+          if (x < w / 2) epubRendition.prev(); else epubRendition.next()
+        }
+        return
       }
+      // txt / pdf：左右滑翻页
+      const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX
+      if (dx < -40) nextPage()
+      else if (dx > 40) prevPage()
     }, { passive: true })
   }
 
@@ -347,6 +354,15 @@ async function renderEpub() {
   } catch (e) {
     console.error('[reader]', e)
   }
+
+  // 生成 location —— 否则 percentageFromCfi 永远返回 0，进度条一直显示 0%
+  try {
+    await book.locations.generate(1024)
+    console.log('[reader] locations generated, total =', book.locations.length?.())
+  } catch (e) {
+    console.warn('[reader] locations.generate failed (EPUB 可能没流式内容)', e)
+  }
+
   const saved = await getProgress(bookId.value)
   try {
     await rendition.display(saved?.cfi || undefined)
@@ -710,17 +726,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <!-- 阅读区 -->
     <div v-if="loading" class="flex-1 flex items-center justify-center text-slate-500">加载中…</div>
     <div v-else-if="error" class="flex-1 flex items-center justify-center text-red-500">{{ error }}</div>
-    <div v-else class="flex-1 overflow-auto" @click="(e) => {
-      // 点击翻页（txt + epub + pdf）：
+    <div v-else
+      :class="['flex-1 reader-scroller', book?.file_format !== 'epub' ? 'reader-scroller-paged' : '']"
+      @click="(e) => {
+      // 点击翻页（txt + pdf）：
       //   左 1/3 → 上一页，右 2/3 → 下一页
-      //   宽屏（≥768px）点击不翻页（留给 PC 鼠标选中/滚动）
+      //   epubjs 自己处理翻页，所以 epub 不在这里绑定
+      if (book?.file_format === 'epub') return
       const x = e.offsetX; const w = (e.currentTarget as HTMLElement).clientWidth
       if (w < 768) {
         if (x < w / 3) prevPage()
         else if (x > w * 2 / 3) nextPage()
       }
     }">
-      <div ref="readerRef" class="reader-area" style="height: calc(100vh - 120px); min-height: 480px;"></div>
+      <div ref="readerRef" class="reader-area" style="min-height: calc(100vh - 120px);"></div>
     </div>
 
     <!-- 底部翻页 -->
@@ -730,7 +749,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     >
       <div class="max-w-4xl mx-auto px-4 flex items-center justify-between text-sm">
         <button
-          @click="epubPrev()"
+          @click="prevPage()"
           :disabled="book.file_format === 'epub' && !epubRendition"
           class="btn-secondary"
         >上一页</button>
@@ -759,7 +778,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </form>
         </span>
         <button
-          @click="epubNext()"
+          @click="nextPage()"
           :disabled="book.file_format === 'epub' && !epubRendition"
           class="btn-secondary"
         >下一页</button>
