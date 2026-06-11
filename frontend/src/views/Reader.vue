@@ -919,7 +919,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <p class="text-xs text-slate-400 mt-3">由 MiniMax M3 TTS 提供支持</p>
       </div>
     </div>
-    </div>
 
     <!-- 弹窗：目录 -->
     <div v-if="showToc" class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" @click.self="showToc = false">
