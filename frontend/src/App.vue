@@ -5,6 +5,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useAchievementsStore } from '@/stores/achievements'
 import TabBar from '@/components/TabBar.vue'
 import AchievementToast from '@/components/AchievementToast.vue'
+import { Analytics } from '@vercel/analytics/vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -103,5 +104,8 @@ onMounted(async () => {
     <footer v-if="!showTabBar" class="border-t border-slate-200 py-4 text-center text-xs text-slate-400">
       © {{ new Date().getFullYear() }} 云端图书馆 · Powered by Supabase + Vercel
     </footer>
+
+    <!-- Vercel Web Analytics -->
+    <Analytics />
   </div>
 </template>
