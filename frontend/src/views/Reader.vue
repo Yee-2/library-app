@@ -46,25 +46,31 @@ let progressTimer: any
 let onResize: (() => void) | null = null
 
 onMounted(async () => {
+  console.debug('[reader] onMounted, bookId =', bookId.value)
   try {
-    // 加载已解锁的成就
     onResize = () => { try { epubRendition?.resize() } catch {} }
     window.addEventListener('resize', onResize)
 
     ach.init().then(() => ach.checkAll())
     ach.lastHeartbeat = Date.now()
     const loaded = await getBook(bookId.value)
+    console.debug('[reader] loaded book, format =', loaded?.file_format, 'file_url =', loaded?.file_url)
     book.value = loaded
     const me = await currentUserId()
-    if (loaded.user_id !== me) {
-      error.value = '无权访问此书'
+    console.debug('[reader] currentUserId =', me, 'book.user_id =', loaded?.user_id, 'match =', loaded?.user_id === me)
+    if (me && loaded.user_id !== me) {
+      error.value = '无权访问此书（此书属于其他用户）'
       return
     }
+    console.debug('[reader] creating signed url...')
     fileUrl.value = await getMyBookFileUrl(loaded)
+    console.debug('[reader] signed url =', fileUrl.value.slice(0, 80) + '...')
     await loadSideData()
     await renderReader()
+    console.debug('[reader] renderReader finished')
   } catch (e: any) {
-    error.value = e.message
+    console.error('[reader] onMounted caught:', e)
+    error.value = e.message ?? String(e)
   } finally {
     loading.value = false
   }
