@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onActivated } from 'vue'
 import { listAllAchievements, listMyAchievements } from '@/lib/books'
+import { ArrowLeft, Trophy, Lock } from 'lucide-vue-next'
 
 const items = ref<any[]>([])
 const mine = ref<any[]>([])
@@ -29,9 +30,12 @@ function unlockedAt(id: string) {
 
 <template>
   <div class="max-w-3xl mx-auto px-4 py-6">
-    <div class="flex items-center gap-2 mb-4">
-      <button @click="$router.back()" class="btn-ghost text-sm">← 返回</button>
-      <h1 class="text-xl font-bold">成就徽章</h1>
+    <div class="flex items-center gap-2 mb-5">
+      <button @click="$router.back()" class="btn-ghost -ml-2 flex items-center gap-1">
+        <ArrowLeft class="w-4 h-4" :stroke-width="1.75" />
+        <span>返回</span>
+      </button>
+      <h1 class="text-2xl font-bold tracking-tight">成就徽章</h1>
       <span class="text-sm text-slate-500">{{ mine.length }} / {{ items.length }}</span>
     </div>
 
@@ -42,22 +46,26 @@ function unlockedAt(id: string) {
         v-for="a in items"
         :key="a.id"
         :class="['card p-4 text-center transition',
-                 unlocked(a.id) ? '' : 'opacity-40 grayscale']"
+                 unlocked(a.id) ? '' : 'opacity-40']"
       >
         <div
-          class="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-3xl mb-2"
+          class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-2 ring-2 ring-white shadow-sm"
           :class="unlocked(a.id)
             ? 'bg-gradient-to-br from-amber-100 to-amber-200'
             : 'bg-slate-100'"
         >
-          {{ a.icon || '🏆' }}
+          <span v-if="a.icon" class="text-3xl">{{ a.icon }}</span>
+          <Trophy v-else class="w-8 h-8 text-amber-500" :stroke-width="1.5" />
         </div>
         <div class="font-semibold text-sm">{{ a.name }}</div>
-        <div class="text-xs text-slate-500 mt-1 line-clamp-2">{{ a.description }}</div>
-        <div v-if="unlocked(a.id)" class="text-[10px] text-amber-600 mt-2">
-          {{ new Date(unlockedAt(a.id)).toLocaleDateString('zh-CN') }}
+        <div class="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">{{ a.description }}</div>
+        <div v-if="unlocked(a.id)" class="text-[10px] text-amber-600 mt-2 font-medium">
+          ✓ {{ new Date(unlockedAt(a.id)).toLocaleDateString('zh-CN') }}
         </div>
-        <div v-else class="text-[10px] text-slate-400 mt-2">未解锁</div>
+        <div v-else class="text-[10px] text-slate-400 mt-2 flex items-center justify-center gap-1">
+          <Lock class="w-3 h-3" :stroke-width="1.75" />
+          <span>未解锁</span>
+        </div>
       </div>
     </div>
   </div>

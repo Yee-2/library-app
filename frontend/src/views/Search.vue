@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { debounce } from '@/lib/utils'
 import { searchPublicBooksFulltext } from '@/lib/books'
+import { ArrowLeft, Search as SearchIcon, BookOpen } from 'lucide-vue-next'
 
 const router = useRouter()
 const q = ref('')
@@ -31,32 +32,41 @@ function go(b: any) { router.push(`/book/${b.id}`) }
 
 <template>
   <div class="max-w-3xl mx-auto px-4 py-6">
-    <div class="flex items-center gap-2 mb-4">
-      <button @click="$router.back()" class="btn-ghost text-sm">← 返回</button>
-      <h1 class="text-xl font-bold">搜索</h1>
+    <div class="flex items-center gap-2 mb-5">
+      <button @click="$router.back()" class="btn-ghost -ml-2 flex items-center gap-1">
+        <ArrowLeft class="w-4 h-4" :stroke-width="1.75" />
+        <span>返回</span>
+      </button>
+      <h1 class="text-2xl font-bold tracking-tight">搜索</h1>
     </div>
-    <input
-      v-model="q"
-      @input="doSearch"
-      placeholder="输入书名、作者、简介关键词…"
-      class="input mb-4"
-      autofocus
-    />
+    <div class="relative mb-5">
+      <SearchIcon class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" :stroke-width="1.75" />
+      <input
+        v-model="q"
+        @input="doSearch"
+        placeholder="输入书名、作者、简介关键词…"
+        class="input pl-10"
+        autofocus
+      />
+    </div>
 
     <div v-if="loading" class="text-center text-slate-500 py-8">搜索中…</div>
-    <div v-else-if="error" class="text-center text-red-500 py-8">{{ error }}</div>
-    <div v-else-if="q && results.length === 0" class="text-center text-slate-500 py-8">没找到相关结果</div>
+    <div v-else-if="error" class="text-center text-rose-500 py-8">{{ error }}</div>
+    <div v-else-if="q && results.length === 0" class="text-center py-16">
+      <BookOpen class="w-12 h-12 mx-auto text-slate-300 mb-2" :stroke-width="1.5" />
+      <p class="text-slate-500">没找到相关结果</p>
+    </div>
     <div v-else class="space-y-2">
-      <div v-for="b in results" :key="b.id" class="card p-3 flex items-center gap-3 cursor-pointer" @click="go(b)">
-        <div class="w-12 h-16 bg-slate-100 rounded overflow-hidden flex-shrink-0">
-          <img v-if="b.cover_url" :src="b.cover_url" class="w-full h-full object-cover" />
+      <div v-for="b in results" :key="b.id" class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition" @click="go(b)">
+        <div class="w-12 h-16 bg-slate-100 rounded-md overflow-hidden flex-shrink-0">
+          <img v-if="b.cover_url" :src="b.cover_url" class="w-full h-full object-cover" :alt="b.title" />
         </div>
         <div class="flex-1 min-w-0">
           <div class="font-medium text-sm line-clamp-1">{{ b.title }}</div>
           <div class="text-xs text-slate-500">{{ b.author || '佚名' }}</div>
           <div v-if="b.description" class="text-xs text-slate-400 line-clamp-1 mt-0.5">{{ b.description }}</div>
         </div>
-        <span class="text-xs text-slate-400 uppercase">{{ b.file_format }}</span>
+        <span class="text-xs text-slate-400 uppercase font-mono">{{ b.file_format }}</span>
       </div>
     </div>
   </div>

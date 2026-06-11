@@ -1,50 +1,46 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onBeforeUnmount, watch } from 'vue'
+import { Trophy } from 'lucide-vue-next'
 import { useAchievementsStore } from '@/stores/achievements'
 
 const ach = useAchievementsStore()
+const visible = ref(false)
+const current = ref<{ name: string; icon: string | null } | null>(null)
 let timer: any
 
 function showNext() {
   const t = ach.consumeToast()
   if (!t) return
-  const el = document.getElementById('ach-toast')
-  if (!el) return
-  el.innerHTML = `
-    <div class="flex items-center gap-2">
-      <div class="text-3xl">${t.icon || '🏆'}</div>
-      <div>
-        <div class="text-xs text-amber-100/80">解锁成就</div>
-        <div class="font-bold">${t.name}</div>
-      </div>
-    </div>
-  `
-  el.classList.remove('translate-y-32', 'opacity-0')
-  el.classList.add('translate-y-0', 'opacity-100')
+  current.value = t
+  visible.value = true
   clearTimeout(timer)
-  timer = setTimeout(hide, 3500)
-}
-
-function hide() {
-  const el = document.getElementById('ach-toast')
-  if (!el) return
-  el.classList.add('translate-y-32', 'opacity-0')
-  el.classList.remove('translate-y-0', 'opacity-100')
+  timer = setTimeout(() => { visible.value = false }, 3500)
 }
 
 watch(() => ach.toastQueue.length, (n) => { if (n > 0) showNext() })
-
-onMounted(() => {})
 onBeforeUnmount(() => clearTimeout(timer))
 </script>
 
 <template>
-  <div
-    id="ach-toast"
-    class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl
-           bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-2xl
-           opacity-0 translate-y-32 transition-all duration-300 pointer-events-none"
+  <Transition
+    enter-active-class="transition-all duration-300 ease-out"
+    leave-active-class="transition-all duration-300 ease-in"
+    enter-from-class="translate-y-32 opacity-0"
+    leave-to-class="translate-y-32 opacity-0"
   >
-    <!-- 内容由 JS 注入 -->
-  </div>
+    <div
+      v-if="visible"
+      class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl
+             bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-2xl
+             flex items-center gap-3 pointer-events-none"
+    >
+      <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+        <Trophy class="w-5 h-5 text-white" :stroke-width="2" />
+      </div>
+      <div>
+        <div class="text-[11px] text-amber-50/80 font-medium">解锁成就</div>
+        <div class="font-semibold text-sm leading-tight">{{ current?.name }}</div>
+      </div>
+    </div>
+  </Transition>
 </template>

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
-import { onActivated, onDeactivated } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { getBook, getMyBookFileUrl, upsertProgress, getProgress, listBookmarks, addBookmark, deleteBookmark, listNotes, addNote, deleteNote, reportReadingHeartbeat } from '@/lib/books'
 import { useReaderStore } from '@/stores/reader'
 import { ttsSynthesize, splitSentences, extractPdfText } from '@/lib/tts'
 import { useAchievementsStore } from '@/stores/achievements'
 import { FONT_OPTIONS, THEME_OPTIONS, TTS_VOICES } from '@/types'
+import { ListTree, Bookmark as BookmarkIcon, NotebookPen, Volume2, Settings, Pause, Play, Square, RefreshCw, X, ArrowLeft } from 'lucide-vue-next'
 import type { Book, Bookmark, Note } from '@/types'
 
 const route = useRoute()
@@ -675,7 +675,7 @@ async function gotoBookmark(b: Bookmark) {
 }
 async function removeBookmark(id: string) {
   await deleteBookmark(id)
-  bookmarks.value = bookmarks.value.filter(b => b.id !== id)
+  bookmarks.value = bookmarks.value.filter((b: Bookmark) => b.id !== id)
 }
 
 // =============== 笔记 ===============
@@ -713,16 +713,29 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <!-- 顶部工具栏 -->
     <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
       <div class="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between gap-2">
-        <RouterLink to="/library" class="btn-ghost text-sm">← 返回</RouterLink>
+        <RouterLink to="/library" class="btn-ghost -ml-2 flex items-center gap-1 text-sm">
+          <ArrowLeft class="w-4 h-4" :stroke-width="1.75" />
+          <span class="hidden sm:inline">返回</span>
+        </RouterLink>
         <div class="flex-1 text-center text-sm font-medium truncate" :title="book?.title">
           {{ book?.title || '加载中…' }}
         </div>
-        <div class="flex items-center gap-1">
-          <button @click="showToc = !showToc" class="btn-ghost p-1.5" title="目录">📑</button>
-          <button @click="showBookmarks = true" class="btn-ghost p-1.5" title="书签">🔖</button>
-          <button @click="showNotes = true" class="btn-ghost p-1.5" title="笔记">📝</button>
-          <button @click="showTTS = true; startTTS()" class="btn-ghost p-1.5" title="AI 听书">🔊</button>
-          <button @click="showSettings = true" class="btn-ghost p-1.5" title="设置">⚙️</button>
+        <div class="flex items-center gap-0.5">
+          <button @click="showToc = !showToc" class="btn-icon btn-ghost" title="目录">
+            <ListTree class="w-5 h-5" :stroke-width="1.75" />
+          </button>
+          <button @click="showBookmarks = true" class="btn-icon btn-ghost" title="书签">
+            <BookmarkIcon class="w-5 h-5" :stroke-width="1.75" />
+          </button>
+          <button @click="showNotes = true" class="btn-icon btn-ghost" title="笔记">
+            <NotebookPen class="w-5 h-5" :stroke-width="1.75" />
+          </button>
+          <button @click="showTTS = true; startTTS()" class="btn-icon btn-ghost" title="AI 听书">
+            <Volume2 class="w-5 h-5" :stroke-width="1.75" />
+          </button>
+          <button @click="showSettings = true" class="btn-icon btn-ghost" title="设置">
+            <Settings class="w-5 h-5" :stroke-width="1.75" />
+          </button>
         </div>
       </div>
       <div class="h-0.5 bg-slate-100">
@@ -797,7 +810,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] overflow-auto">
         <div class="flex justify-between items-center mb-4">
           <h3 class="font-semibold">阅读设置</h3>
-          <button @click="showSettings = false" class="text-slate-400">✕</button>
+          <button @click="showSettings = false" class="text-slate-400"><X class="w-5 h-5" :stroke-width="1.75" /></button>
         </div>
 
         <section class="mb-4">
@@ -860,7 +873,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <h3 class="font-semibold">书签 ({{ bookmarks.length }})</h3>
           <div class="flex items-center gap-2">
             <button @click="addCurrentBookmark" class="text-brand-600 text-sm">+ 添加当前页</button>
-            <button @click="showBookmarks = false" class="text-slate-400">✕</button>
+            <button @click="showBookmarks = false" class="text-slate-400"><X class="w-5 h-5" :stroke-width="1.75" /></button>
           </div>
         </div>
         <div class="flex-1 overflow-auto space-y-2">
@@ -883,7 +896,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] flex flex-col">
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">笔记 ({{ notes.length }})</h3>
-          <button @click="showNotes = false" class="text-slate-400">✕</button>
+          <button @click="showNotes = false" class="text-slate-400"><X class="w-5 h-5" :stroke-width="1.75" /></button>
         </div>
         <div class="mb-3 flex gap-2">
           <input v-model="newNoteText" placeholder="添加新笔记…" class="input" @keydown.enter="addNoteManual" />
@@ -910,7 +923,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5">
         <div class="flex justify-between items-center mb-4">
           <h3 class="font-semibold">AI 听书</h3>
-          <button @click="showTTS = false; stopTTS()" class="text-slate-400">✕</button>
+          <button @click="showTTS = false; stopTTS()" class="text-slate-400"><X class="w-5 h-5" :stroke-width="1.75" /></button>
         </div>
 
         <section class="mb-4">
@@ -941,10 +954,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         </div>
 
         <div class="flex gap-2">
-          <button v-if="!ttsPaused" @click="pauseTTS" :disabled="!ttsPlaying" class="btn-secondary flex-1">⏸ 暂停</button>
-          <button v-else @click="resumeTTS" class="btn-primary flex-1">▶ 继续</button>
-          <button @click="stopTTS" :disabled="!ttsPlaying" class="btn-secondary">⏹ 停止</button>
-          <button @click="startTTS" class="btn-primary">🔄 重新播放</button>
+          <button v-if="!ttsPaused" @click="pauseTTS" :disabled="!ttsPlaying" class="btn-secondary flex-1">
+            <Pause class="w-4 h-4" :stroke-width="1.75" />
+            <span>暂停</span>
+          </button>
+          <button v-else @click="resumeTTS" class="btn-primary flex-1">
+            <Play class="w-4 h-4" :stroke-width="1.75" />
+            <span>继续</span>
+          </button>
+          <button @click="stopTTS" :disabled="!ttsPlaying" class="btn-secondary">
+            <Square class="w-4 h-4" :stroke-width="1.75" />
+            <span>停止</span>
+          </button>
+          <button @click="startTTS" class="btn-primary">
+            <RefreshCw class="w-4 h-4" :stroke-width="1.75" />
+            <span>重新播放</span>
+          </button>
         </div>
         <p class="text-xs text-slate-400 mt-3">由 MiniMax M3 TTS 提供支持</p>
       </div>
@@ -955,7 +980,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] flex flex-col">
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">目录 ({{ chapters.length }})</h3>
-          <button @click="showToc = false" class="text-slate-400">✕</button>
+          <button @click="showToc = false" class="text-slate-400"><X class="w-5 h-5" :stroke-width="1.75" /></button>
         </div>
         <div v-if="chapters.length === 0" class="text-center text-slate-400 py-6 text-sm">暂无目录</div>
         <div class="flex-1 overflow-auto space-y-1">

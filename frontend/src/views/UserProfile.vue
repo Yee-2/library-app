@@ -6,6 +6,8 @@ import {
   uploadAvatar, updateMyProfile
 } from '@/lib/books'
 import { useAuthStore } from '@/stores/auth'
+import { ArrowLeft, Upload, Trophy, BookOpen, Pencil } from 'lucide-vue-next'
+import BookCard from '@/components/BookCard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -105,93 +107,104 @@ async function saveBio() {
 <template>
   <div class="max-w-3xl mx-auto px-4 py-6">
     <div class="flex items-center gap-2 mb-4">
-      <button @click="$router.back()" class="btn-ghost text-sm">← 返回</button>
+      <button @click="$router.back()" class="btn-ghost -ml-2 flex items-center gap-1">
+        <ArrowLeft class="w-4 h-4" :stroke-width="1.75" />
+        <span>返回</span>
+      </button>
     </div>
 
     <div v-if="loading" class="text-center text-slate-500 py-8">加载中…</div>
 
     <div v-else>
       <!-- 头部 -->
-      <div class="card p-5 mb-4">
-        <div class="flex items-center gap-4">
-          <div class="relative group">
-            <div class="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-2xl font-bold">
-              <img v-if="profile?.avatar_url" :src="profile.avatar_url" class="w-full h-full object-cover" alt="avatar" />
-              <span v-else>{{ (profile?.username || '?')[0].toUpperCase() }}</span>
+      <div class="card p-5 mb-4 relative overflow-hidden">
+        <div class="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gradient-to-br from-brand-100 to-violet-100 blur-3xl opacity-50" />
+        <div class="relative">
+          <div class="flex items-center gap-4">
+            <div class="relative group">
+              <div class="w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-2xl font-bold ring-4 ring-white shadow-md">
+                <img v-if="profile?.avatar_url" :src="profile.avatar_url" class="w-full h-full object-cover" alt="avatar" />
+                <span v-else>{{ (profile?.username || '?')[0].toUpperCase() }}</span>
+              </div>
+              <label v-if="isMe" class="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs opacity-0 group-hover:opacity-100 cursor-pointer rounded-full transition-opacity">
+                <Upload class="w-3.5 h-3.5 mr-0.5" :stroke-width="1.75" />
+                <span>{{ uploadingAvatar ? '上传中' : '更换' }}</span>
+                <input
+                  ref="avatarFileInput"
+                  type="file"
+                  accept="image/*"
+                  class="hidden"
+                  :disabled="uploadingAvatar"
+                  @change="onAvatarChange"
+                />
+              </label>
             </div>
-            <label v-if="isMe" class="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs opacity-0 group-hover:opacity-100 cursor-pointer rounded-full transition-opacity">
-              {{ uploadingAvatar ? '上传中…' : '更换' }}
-              <input
-                ref="avatarFileInput"
-                type="file"
-                accept="image/*"
-                class="hidden"
-                :disabled="uploadingAvatar"
-                @change="onAvatarChange"
-              />
-            </label>
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="font-bold text-lg">{{ profile?.username || '匿名用户' }}</div>
-            <div v-if="!editingBio" class="flex items-start gap-2 mt-0.5">
-              <span class="text-sm text-slate-500 flex-1">{{ profile?.bio || '这个人很懒，什么也没写' }}</span>
-              <button v-if="isMe" @click="startEditBio" class="text-xs text-brand-600 hover:underline flex-shrink-0">编辑</button>
-            </div>
-            <div v-else class="mt-1">
-              <textarea v-model="bioDraft" rows="2" maxlength="200" class="input text-sm" placeholder="说说你自己…" />
-              <div class="flex justify-between items-center mt-1">
-                <span class="text-xs text-slate-400">{{ bioDraft.length }} / 200</span>
-                <div class="flex gap-2">
-                  <button @click="cancelEditBio" class="text-xs btn-secondary px-2 py-1">取消</button>
-                  <button @click="saveBio" :disabled="savingBio" class="text-xs btn-primary px-2 py-1">
-                    {{ savingBio ? '保存中…' : '保存' }}
-                  </button>
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-lg tracking-tight">{{ profile?.username || '匿名用户' }}</div>
+              <div v-if="!editingBio" class="flex items-start gap-2 mt-0.5">
+                <span class="text-sm text-slate-500 flex-1">{{ profile?.bio || '这个人很懒，什么也没写' }}</span>
+                <button v-if="isMe" @click="startEditBio" class="text-xs text-brand-600 hover:underline flex-shrink-0 flex items-center gap-0.5">
+                  <Pencil class="w-3 h-3" :stroke-width="1.75" />
+                  <span>编辑</span>
+                </button>
+              </div>
+              <div v-else class="mt-1">
+                <textarea v-model="bioDraft" rows="2" maxlength="200" class="input text-sm" placeholder="说说你自己…" />
+                <div class="flex justify-between items-center mt-1">
+                  <span class="text-xs text-slate-400">{{ bioDraft.length }} / 200</span>
+                  <div class="flex gap-2">
+                    <button @click="cancelEditBio" class="text-xs btn-secondary px-2 py-1">取消</button>
+                    <button @click="saveBio" :disabled="savingBio" class="text-xs btn-primary px-2 py-1">
+                      {{ savingBio ? '保存中…' : '保存' }}
+                    </button>
+                  </div>
                 </div>
               </div>
+              <div class="text-xs text-slate-400 mt-1">加入于 {{ new Date(profile?.created_at).toLocaleDateString('zh-CN') }}</div>
             </div>
-            <div class="text-xs text-slate-400 mt-1">加入于 {{ new Date(profile?.created_at).toLocaleDateString('zh-CN') }}</div>
+            <button
+              v-if="!isMe"
+              @click="toggleFollow"
+              :class="following ? 'btn-secondary' : 'btn-primary'"
+              class="text-sm"
+            >
+              {{ following ? '已关注' : '+ 关注' }}
+            </button>
           </div>
-          <button
-            v-if="!isMe"
-            @click="toggleFollow"
-            :class="following ? 'btn-secondary' : 'btn-primary'"
-            class="text-sm"
-          >
-            {{ following ? '已关注' : '+ 关注' }}
-          </button>
-        </div>
 
-        <!-- 统计 -->
-        <div class="grid grid-cols-5 gap-1 mt-5 text-center text-sm">
-          <div>
-            <div class="font-bold">{{ stats?.books_count || 0 }}</div>
-            <div class="text-xs text-slate-500">藏书</div>
-          </div>
-          <div>
-            <div class="font-bold">{{ stats?.followers_count || 0 }}</div>
-            <div class="text-xs text-slate-500">粉丝</div>
-          </div>
-          <div>
-            <div class="font-bold">{{ stats?.following_count || 0 }}</div>
-            <div class="text-xs text-slate-500">关注</div>
-          </div>
-          <div>
-            <div class="font-bold">{{ Math.floor((stats?.total_seconds || 0) / 3600) }}h</div>
-            <div class="text-xs text-slate-500">阅读</div>
-          </div>
-          <div>
-            <div class="font-bold">{{ stats?.achievements_count || 0 }}</div>
-            <div class="text-xs text-slate-500">成就</div>
+          <!-- 统计 -->
+          <div class="grid grid-cols-5 gap-2 mt-5 text-center text-sm">
+            <div class="py-2">
+              <div class="font-bold text-lg text-brand-600">{{ stats?.books_count || 0 }}</div>
+              <div class="text-xs text-slate-500">藏书</div>
+            </div>
+            <div class="py-2">
+              <div class="font-bold text-lg text-brand-600">{{ stats?.followers_count || 0 }}</div>
+              <div class="text-xs text-slate-500">粉丝</div>
+            </div>
+            <div class="py-2">
+              <div class="font-bold text-lg text-brand-600">{{ stats?.following_count || 0 }}</div>
+              <div class="text-xs text-slate-500">关注</div>
+            </div>
+            <div class="py-2">
+              <div class="font-bold text-lg text-brand-600">{{ Math.floor((stats?.total_seconds || 0) / 3600) }}h</div>
+              <div class="text-xs text-slate-500">阅读</div>
+            </div>
+            <div class="py-2">
+              <div class="font-bold text-lg text-brand-600">{{ stats?.achievements_count || 0 }}</div>
+              <div class="text-xs text-slate-500">成就</div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- 成就 -->
       <div v-if="achievements.length" class="card p-4 mb-4">
-        <h3 class="font-semibold text-sm mb-2">成就</h3>
+        <h3 class="font-semibold text-sm mb-3 tracking-tight">成就</h3>
         <div class="flex flex-wrap gap-2">
-          <div v-for="a in achievements" :key="a.achievement_id" class="px-2 py-1 rounded-full bg-amber-50 text-amber-700 text-xs flex items-center gap-1">
-            <span>{{ a.achievements?.icon }}</span>
+          <div v-for="a in achievements" :key="a.achievement_id" class="badge-amber flex items-center gap-1">
+            <span v-if="a.achievements?.icon" class="text-sm">{{ a.achievements.icon }}</span>
+            <Trophy v-else class="w-3 h-3" :stroke-width="1.75" />
             <span>{{ a.achievements?.name }}</span>
           </div>
         </div>
@@ -199,16 +212,13 @@ async function saveBio() {
 
       <!-- 公开书 -->
       <div class="card p-4">
-        <h3 class="font-semibold text-sm mb-3">公开的图书</h3>
-        <div v-if="books.length === 0" class="text-sm text-slate-400 text-center py-6">还没有公开的图书</div>
+        <h3 class="font-semibold text-sm mb-3 tracking-tight">公开的图书</h3>
+        <div v-if="books.length === 0" class="py-8 text-center">
+          <BookOpen class="w-10 h-10 mx-auto text-slate-300 mb-2" :stroke-width="1.5" />
+          <p class="text-sm text-slate-400">还没有公开的图书</p>
+        </div>
         <div v-else class="grid grid-cols-3 sm:grid-cols-4 gap-3">
-          <div v-for="b in books" :key="b.id" class="cursor-pointer" @click="readBook(b)">
-            <div class="aspect-[3/4] bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg overflow-hidden mb-1">
-              <img v-if="b.cover_url" :src="b.cover_url" class="w-full h-full object-cover" />
-              <div v-else class="w-full h-full flex items-center justify-center text-2xl opacity-30">📖</div>
-            </div>
-            <div class="text-xs line-clamp-1">{{ b.title }}</div>
-          </div>
+          <BookCard v-for="b in books" :key="b.id" :book="b" :show-format="false" :show-meta="false" @open="readBook" />
         </div>
       </div>
     </div>

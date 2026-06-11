@@ -5,6 +5,8 @@ import { listMyBooks, uploadBook, deleteBook, togglePublic } from '@/lib/books'
 import { detectFormat } from '@/lib/books'
 import { formatBytes, formatDate } from '@/lib/utils'
 import type { Book } from '@/types'
+import { Upload, Search, Star, BarChart3, X, Globe, Lock, Trash2, BookOpen } from 'lucide-vue-next'
+import BookCard from '@/components/BookCard.vue'
 
 const router = useRouter()
 const books = ref<Book[]>([])
@@ -21,6 +23,8 @@ const author = ref('')
 const description = ref('')
 const isPublic = ref(false)
 const coverFile = ref<File | null>(null)
+
+const formats = ['all', 'epub', 'pdf', 'txt', 'mobi'] as const
 
 const filtered = computed(() => {
   return books.value.filter(b => {
@@ -100,7 +104,6 @@ async function handleTogglePublic(b: Book) {
   try {
     await togglePublic(b)
     await refresh()
-    // 公开书触发分享成就
     const { useAchievementsStore } = await import('@/stores/achievements')
     const ach = useAchievementsStore()
     await ach.checkAll()
@@ -109,118 +112,148 @@ async function handleTogglePublic(b: Book) {
   }
 }
 
-function readBook(b: Book) {
-  router.push(`/read/${b.id}`)
+function readBook(b: Book | string) {
+  const id = typeof b === 'string' ? b : b.id
+  router.push(`/read/${id}`)
 }
 </script>
 
 <template>
   <div class="max-w-6xl mx-auto px-4 py-6">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold">我的书架</h1>
-      <div class="flex items-center gap-2">
-        <button @click="router.push('/search')" class="btn-ghost p-2" title="搜索">🔍</button>
-        <button @click="router.push('/favorites')" class="btn-ghost p-2" title="收藏">⭐</button>
-        <button @click="router.push('/stats')" class="btn-ghost p-2" title="统计">📊</button>
-        <button @click="showUpload = true" class="btn-primary">+ 导入</button>
+    <div class="flex items-center justify-between mb-5">
+      <h1 class="text-2xl font-bold tracking-tight">我的书架</h1>
+      <div class="flex items-center gap-1">
+        <button @click="router.push('/search')" class="btn-icon btn-ghost" title="搜索">
+          <Search class="w-5 h-5" :stroke-width="1.75" />
+        </button>
+        <button @click="router.push('/favorites')" class="btn-icon btn-ghost" title="收藏">
+          <Star class="w-5 h-5" :stroke-width="1.75" />
+        </button>
+        <button @click="router.push('/stats')" class="btn-icon btn-ghost" title="统计">
+          <BarChart3 class="w-5 h-5" :stroke-width="1.75" />
+        </button>
+        <button @click="showUpload = true" class="btn-primary ml-2">
+          <Upload class="w-4 h-4" :stroke-width="1.75" />
+          <span>导入</span>
+        </button>
       </div>
     </div>
 
-    <div class="flex flex-wrap gap-2 mb-4">
-      <input v-model="search" placeholder="搜索书名/作者" class="input flex-1 min-w-[200px]" />
-      <select v-model="filterFormat" class="input max-w-[140px]">
-        <option value="all">全部格式</option>
-        <option value="epub">EPUB</option>
-        <option value="pdf">PDF</option>
-        <option value="txt">TXT</option>
-        <option value="mobi">MOBI</option>
-      </select>
+    <!-- 搜索 + 格式筛选 -->
+    <div class="flex flex-wrap items-center gap-2 mb-5">
+      <div class="relative flex-1 min-w-[200px]">
+        <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" :stroke-width="1.75" />
+        <input v-model="search" placeholder="搜索书名/作者" class="input pl-10" />
+      </div>
+      <div class="inline-flex bg-slate-100 rounded-full p-1 text-sm gap-1">
+        <button
+          v-for="f in formats"
+          :key="f"
+          @click="filterFormat = f"
+          :class="['px-3 h-8 rounded-full transition',
+                   filterFormat === f ? 'bg-white shadow-sm font-medium text-slate-900' : 'text-slate-500 hover:text-slate-700']"
+        >
+          {{ f === 'all' ? '全部' : f.toUpperCase() }}
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="text-center text-slate-500 py-12">加载中…</div>
 
-    <div v-else-if="filtered.length === 0" class="text-center text-slate-500 py-12">
-      <p class="mb-2">书架空空如也</p>
-      <button @click="showUpload = true" class="text-brand-600 hover:underline">立即导入第一本</button>
+    <!-- 空状态 -->
+    <div v-else-if="filtered.length === 0" class="text-center py-16">
+      <BookOpen class="w-16 h-16 mx-auto text-slate-300 mb-3" :stroke-width="1.5" />
+      <p class="text-slate-500 mb-3">书架空空如也</p>
+      <button @click="showUpload = true" class="btn-primary">
+        <Upload class="w-4 h-4" :stroke-width="1.75" />
+        <span>立即导入第一本</span>
+      </button>
     </div>
 
+    <!-- 书架网格 -->
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-      <div
-        v-for="b in filtered"
-        :key="b.id"
-        class="card overflow-hidden flex flex-col hover:shadow-md transition group"
-      >
-        <div
-          class="aspect-[3/4] bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden cursor-pointer"
-          @click="readBook(b)"
-        >
-          <img v-if="b.cover_url" :src="b.cover_url" class="w-full h-full object-cover" :alt="b.title" />
-          <div v-else class="text-4xl opacity-30">📖</div>
+      <div v-for="b in filtered" :key="b.id" class="group/card relative">
+        <BookCard :book="b" @open="readBook" />
+        <!-- hover 操作按钮 -->
+        <div class="absolute bottom-[68px] left-2 right-2 flex gap-1
+                    opacity-0 group-hover/card:opacity-100 transition-opacity">
+          <button @click="readBook(b)" class="flex-1 text-xs h-7 rounded-lg bg-white/95 shadow text-brand-600 font-medium">
+            阅读
+          </button>
+          <button @click="handleTogglePublic(b)" class="h-7 px-2 rounded-lg bg-white/95 shadow text-slate-600 flex items-center justify-center" :title="b.is_public ? '取消公开' : '公开'">
+            <component :is="b.is_public ? Lock : Globe" class="w-3.5 h-3.5" :stroke-width="1.75" />
+          </button>
+          <button @click="handleDelete(b)" class="h-7 px-2 rounded-lg bg-white/95 shadow text-rose-500 flex items-center justify-center" title="删除">
+            <Trash2 class="w-3.5 h-3.5" :stroke-width="1.75" />
+          </button>
         </div>
-        <div class="p-3 flex-1 flex flex-col">
-          <h3 class="font-medium text-sm line-clamp-2" :title="b.title">{{ b.title }}</h3>
-          <p class="text-xs text-slate-500 line-clamp-1 mt-0.5">{{ b.author || '佚名' }}</p>
-          <div class="mt-2 flex items-center justify-between text-[10px] text-slate-400">
-            <span class="uppercase font-mono">{{ b.file_format }}</span>
-            <span>{{ formatBytes(b.file_size) }}</span>
-          </div>
-          <div class="mt-2 flex items-center gap-1 text-[10px] text-slate-400">
-            <span>{{ formatDate(b.updated_at) }}</span>
-            <span v-if="b.is_public" class="px-1.5 py-0.5 bg-green-100 text-green-600 rounded">公开</span>
-          </div>
-          <div class="mt-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-            <button @click="readBook(b)" class="text-xs text-brand-600 hover:underline flex-1">阅读</button>
-            <button @click="handleTogglePublic(b)" class="text-xs text-slate-500 hover:underline">
-              {{ b.is_public ? '取消公开' : '公开' }}
-            </button>
-            <button @click="handleDelete(b)" class="text-xs text-red-500 hover:underline">删除</button>
-          </div>
+        <div class="px-2.5 mt-1 flex items-center justify-between text-[10px] text-slate-400">
+          <span>{{ formatDate(b.updated_at) }}</span>
         </div>
       </div>
     </div>
 
     <!-- 上传弹窗 -->
-    <div
-      v-if="showUpload"
-      class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4"
-      @click.self="showUpload = false"
+    <Transition
+      enter-active-class="transition-opacity duration-200"
+      leave-active-class="transition-opacity duration-150"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
     >
-      <div class="bg-white rounded-xl w-full max-w-md p-5">
-        <h2 class="text-lg font-semibold mb-3">导入图书</h2>
-        <div class="space-y-3">
-          <div>
-            <label class="text-xs text-slate-600">图书文件（epub/pdf/txt/mobi）</label>
-            <input type="file" accept=".epub,.pdf,.txt,.mobi" @change="onFilePick" class="block mt-1 text-sm" />
-            <p v-if="file" class="text-xs text-slate-500 mt-1">已选：{{ file.name }}</p>
+      <div
+        v-if="showUpload"
+        class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center"
+        @click.self="showUpload = false"
+      >
+        <div class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-6 max-h-[90vh] overflow-auto shadow-2xl">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold tracking-tight">导入图书</h2>
+            <button @click="showUpload = false" class="btn-icon btn-ghost -m-2">
+              <X class="w-5 h-5" :stroke-width="1.75" />
+            </button>
           </div>
-          <div>
-            <label class="text-xs text-slate-600">书名</label>
-            <input v-model="title" class="input mt-1" />
+          <div class="space-y-4">
+            <div>
+              <label class="text-xs font-medium text-slate-600 mb-1.5 block">图书文件（epub/pdf/txt/mobi）</label>
+              <input type="file" accept=".epub,.pdf,.txt,.mobi" @change="onFilePick" class="block w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100" />
+              <p v-if="file" class="text-xs text-slate-500 mt-1.5">已选：{{ file.name }}</p>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-slate-600 mb-1.5 block">书名</label>
+              <input v-model="title" class="input" />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-slate-600 mb-1.5 block">作者</label>
+              <input v-model="author" class="input" />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-slate-600 mb-1.5 block">简介（可选）</label>
+              <textarea v-model="description" rows="3" class="input"></textarea>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-slate-600 mb-1.5 block">封面图（可选）</label>
+              <input type="file" accept="image/*" @change="onCoverPick" class="block w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100" />
+            </div>
+            <label class="flex items-center gap-3 cursor-pointer">
+              <span class="relative inline-block">
+                <input type="checkbox" v-model="isPublic" class="peer sr-only" />
+                <span class="w-9 h-5 rounded-full bg-slate-200 peer-checked:bg-brand-500 transition relative
+                              after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4
+                              after:bg-white after:rounded-full after:shadow after:transition-transform
+                              peer-checked:after:translate-x-4"></span>
+              </span>
+              <span class="text-sm text-slate-700 flex-1">上传到公开书库（其他用户可下载）</span>
+              <Globe class="w-4 h-4 text-slate-400" :stroke-width="1.75" />
+            </label>
           </div>
-          <div>
-            <label class="text-xs text-slate-600">作者</label>
-            <input v-model="author" class="input mt-1" />
+          <div class="mt-6 flex justify-end gap-2">
+            <button @click="showUpload = false" class="btn-secondary">取消</button>
+            <button @click="doUpload" :disabled="!file || uploading" class="btn-primary">
+              {{ uploading ? '上传中…' : '上传' }}
+            </button>
           </div>
-          <div>
-            <label class="text-xs text-slate-600">简介（可选）</label>
-            <textarea v-model="description" rows="3" class="input mt-1"></textarea>
-          </div>
-          <div>
-            <label class="text-xs text-slate-600">封面图（可选）</label>
-            <input type="file" accept="image/*" @change="onCoverPick" class="block mt-1 text-sm" />
-          </div>
-          <label class="flex items-center gap-2 text-sm">
-            <input type="checkbox" v-model="isPublic" />
-            <span>上传到公开书库（其他用户可见可下载）</span>
-          </label>
-        </div>
-        <div class="mt-5 flex justify-end gap-2">
-          <button @click="showUpload = false" class="btn-secondary">取消</button>
-          <button @click="doUpload" :disabled="!file || uploading" class="btn-primary">
-            {{ uploading ? '上传中…' : '上传' }}
-          </button>
         </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>

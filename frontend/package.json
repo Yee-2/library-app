@@ -12,6 +12,7 @@
     "@supabase/supabase-js": "^2.45.4",
     "chart.js": "^4.4.4",
     "epubjs": "^0.3.93",
+    "lucide-vue-next": "^0.577.0",
     "pdfjs-dist": "^4.4.168",
     "pinia": "^2.2.2",
     "vue": "^3.4.38",
