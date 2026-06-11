@@ -11,10 +11,28 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => !!user.value)
 
   async function init() {
-    const { data } = await supabase.auth.getSession()
-    user.value = data.session?.user ?? null
+    // 1) 先读 localStorage 里的 session 拿到 access token（可能已过期）
+    const { data: sess } = await supabase.auth.getSession()
+    user.value = sess.session?.user ?? null
     loading.value = false
 
+    // 2) 立刻向 Supabase 验证 token 有效性 —— 过期就清空 user，
+    //    避免"看着像登录了"但任何操作都 401
+    if (sess.session) {
+      try {
+        const { data: u } = await supabase.auth.getUser()
+        if (!u.user) {
+          user.value = null
+          await supabase.auth.signOut()
+        } else {
+          user.value = u.user
+        }
+      } catch {
+        // 网络/服务问题：保留 localStorage 状态，不强制退出
+      }
+    }
+
+    // 3) 订阅 auth 状态变化
     supabase.auth.onAuthStateChange((_event, session) => {
       user.value = session?.user ?? null
     })

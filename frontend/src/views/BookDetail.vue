@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import {
-  getBook, getPublicBookUrl, getMyBookFileUrl, listReviews, upsertReview, toggleFavorite
+  getBook, getPublicBookUrl, getMyBookFileUrl, listReviews, upsertReview, toggleFavorite, uploadBook
 } from '@/lib/books'
 import { formatDate } from '@/lib/utils'
 

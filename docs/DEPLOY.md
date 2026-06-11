@@ -229,8 +229,20 @@ Caching → Configuration：
 
 ### Q1: 部署后白屏
 按 F12 看 Console 错误：
-- 如果是 `supabase is not defined` → 检查环境变量 VITE_SUPABASE_URL / ANON_KEY 是否设置
+- 如果是 `supabase is not defined` 或 `[Supabase] 缺少 VITE_SUPABASE_URL` → 检查 Vercel 环境变量 VITE_SUPABASE_URL / ANON_KEY 是否设置（Settings → Environment Variables，三种环境都勾上）
 - 如果是 `404 index.html` → 检查 Vercel 的 Output Directory 是否为 `dist`
+
+### Q1.5: Vercel 部署失败（构建报错）
+最常见原因：
+- **Root Directory 设错**：Vercel 项目 → Settings → General → Root Directory 必须设为 `frontend`。否则它在仓库根找 `package.json` 找不到 → build 失败
+- **环境变量缺失**：构建时 Vite 读 `import.meta.env.VITE_*`，没设的话构建能过但运行会断。必须设 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY`
+- **Node 版本不匹配**：Vercel 默认 Node 18/20。如果 package.json 写了 `engines.node >= 20` 之类，Vercel 切到对应版本
+- **vite.config.ts ESM 错误**：`__dirname` 不存在于 ESM，必须用 `import.meta.url` 推算。仓库已用后者写法
+
+调试方法：Vercel 项目 → Deployments → 失败的 deployment → 展开日志看具体哪一步红。
+
+### Q1.6: 部署后每次刷新都跳到登录页
+原因：本地登录的 session 存于浏览器 localStorage，部署版域名不同时是另一个 origin，session 没带过去。在部署版重新登录一次即可。如果**同域名也跳登录**，检查 Supabase Auth → URL Configuration 是否把生产域名加进 Site URL 和 Redirect URLs。
 
 ### Q2: TTS 报错 "TTS upstream error"
 - 检查 Supabase Edge Function 日志：Dashboard → Edge Functions → tts → Logs

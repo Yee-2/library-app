@@ -1,0 +1,10 @@
+node_modules
+.git
+.vercel
+**/node_modules
+**/dist
+**/.cache
+**/vite.config.ts.timestamp-*.mjs
+**/.env
+**/.env.local
+**/package-lock.json
