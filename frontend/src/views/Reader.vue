@@ -192,26 +192,22 @@ async function renderEpub() {
   if (!readerRef.value) return
   readerRef.value.innerHTML = ''
 
-  // 先把文件下载到内存再喂给 epubjs —— 避开 signedUrl 跨域/重定向/Content-Type
-  // 不一致带来的 "不报错但渲染空白" 问题
-  let epubSrc: string
+  // 直接把 epub 作为 ArrayBuffer 喂给 epubjs，避开：
+  //   1) signedUrl 经过 CDN 后 Content-Type 错乱
+  //   2) blob: URL 走 epubjs 内部的 XHR 失败（0.3.93 已知问题：Cannot load book at blob:...）
+  let bookInput: ArrayBuffer | string
   try {
     const res = await fetch(fileUrl.value)
     if (!res.ok) throw new Error('fetch epub failed: ' + res.status)
-    const blob = await res.blob()
-    const proper = blob.type && blob.type.includes('epub')
-      ? blob
-      : new Blob([blob], { type: 'application/epub+zip' })
-    epubBlobUrl = URL.createObjectURL(proper)
-    epubSrc = epubBlobUrl
+    bookInput = await res.arrayBuffer()
+    console.log('[reader] epub fetched, bytes =', (bookInput as ArrayBuffer).byteLength)
   } catch (e) {
-    console.error('[reader] epub download failed', e)
-    epubSrc = fileUrl.value
+    console.error('[reader] epub download failed, falling back to URL', e)
+    bookInput = fileUrl.value
   }
 
-  console.log('[reader] book source =', epubSrc.startsWith('blob:') ? 'blob:...' + epubSrc.slice(-8) : epubSrc)
-  // epubjs: ePub(url) 返回的是 Book，必须 .renderTo(el) 拿 Rendition 才会渲染
-  const book: any = ePub(epubSrc)
+  // epubjs: ePub(urlOrData) 接受 string 或 ArrayBuffer
+  const book: any = ePub(bookInput)
   epubBook = book
 
   const rendition: any = book.renderTo(readerRef.value, {
