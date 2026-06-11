@@ -318,21 +318,42 @@ async function renderEpub() {
   book.on?.('closed', () => console.log('[reader] book closed'))
   rendition.on?.('displayed', () => {
     console.log('[reader] rendition displayed, contents.length =', rendition.contents?.length)
-    // displayed 之后 iframe 才存在
+    // displayed 之后给所有 iframe 注入一次 CSS（不持续监听，避免循环）
+    const injectCss = () => {
+      const iframes = readerRef.value?.querySelectorAll('iframe') || []
+      const theme = reader.theme()
+      const css = `
+        body { background: ${theme.bg} !important; color: ${theme.color} !important; }
+        a { color: inherit !important; }
+      `
+      iframes.forEach((iframe: any) => {
+        try {
+          const doc = iframe.contentDocument || iframe.contentWindow?.document
+          if (!doc) return
+          let style = doc.getElementById('reader-static-style') as HTMLStyleElement | null
+          if (!style) {
+            style = doc.createElement('style')
+            style.id = 'reader-static-style'
+            doc.head?.appendChild(style)
+          }
+          style.textContent = css
+        } catch {}
+      })
+    }
+    injectCss()
     setTimeout(() => {
+      injectCss()
       try {
         const iframe = readerRef.value?.querySelector('iframe')
-        if (!iframe) {
-          console.warn('[reader-debug] no iframe after displayed, readerRef innerHTML =', readerRef.value?.innerHTML?.slice(0, 300))
-          return
+        if (iframe) {
+          const doc = iframe.contentDocument || iframe.contentWindow?.document
+          console.log('[reader-debug] body text =', doc?.body?.textContent?.slice(0, 200))
+          console.log('[reader-debug] iframe =', iframe.clientWidth, 'x', iframe.clientHeight)
+          const cs = doc?.body ? getComputedStyle(doc.body) : null
+          console.log('[reader-debug] color=', cs?.color, 'bg=', cs?.background?.slice(0, 50))
+        } else {
+          console.warn('[reader-debug] no iframe')
         }
-        const doc = iframe.contentDocument || iframe.contentWindow?.document
-        console.log('[reader-debug] iframe body text =', doc?.body?.textContent?.slice(0, 200))
-        console.log('[reader-debug] iframe size =', iframe.clientWidth, 'x', iframe.clientHeight)
-        const cs = doc?.body ? getComputedStyle(doc.body) : null
-        console.log('[reader-debug] body color=', cs?.color, 'bg=', cs?.background?.slice(0, 50), 'vis=', cs?.visibility, 'op=', cs?.opacity, 'over=', cs?.overflow)
-        const container = readerRef.value?.querySelector('.epub-container') as HTMLElement | null
-        console.log('[reader-debug] epub-container size =', container?.clientWidth, 'x', container?.clientHeight, 'display =', container ? getComputedStyle(container).display : 'n/a')
       } catch (e) { console.warn('[reader-debug] failed', e) }
     }, 500)
   })
@@ -445,27 +466,10 @@ async function renderEpub() {
   })
 }
 
-// 应用 epub 主题（基于 reader.themeId）
-function applyEpubTheme(rendition: any) {
+// 应用 epub 字号（唯一稳定的 themes API）
+function applyEpubFontSize(rendition: any) {
   if (!rendition) return
-  const id = reader.themeId
-  const map: Record<string, string> = {
-    light: 'reader-light',
-    eye: 'reader-eye',
-    paper: 'reader-paper',
-    dark: 'reader-dark',
-  }
-  const themeId = map[id] || 'reader-light'
-  // 改用 defaultRules 方式 —— themes.select 内部会触发 reflow
-  // 先用 override 改字号行距字号（不传 importance，避免 !important 冲突）
-  rendition.themes.fontSize(`${reader.fontSize}px`)
-  rendition.themes.select(themeId)
-}
-
-// 应用 epub 字号/行距/字体（基于 reader.fontSize/lineHeight/fontId）
-function applyEpubStyles(rendition: any) {
-  if (!rendition) return
-  rendition.themes.fontSize(`${reader.fontSize}px`)
+  try { rendition.themes.fontSize(`${reader.fontSize}px`) } catch {}
 }
 
 async function renderPdf() {
