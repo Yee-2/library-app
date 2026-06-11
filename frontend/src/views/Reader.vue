@@ -96,20 +96,40 @@ const txtTotalPages = ref(1)
 const progressPct = ref(0)
 
 async function renderReader() {
-  await nextTick()
-  if (!readerRef.value) return
+  // 等 readerRef 真正挂到 DOM 上 —— v-if/v-else 切到 v-else 时 ref 是后挂的
+  for (let i = 0; i < 20; i++) {
+    if (readerRef.value) break
+    await nextTick()
+    await new Promise(r => setTimeout(r, 50))
+  }
+  if (!readerRef.value) {
+    console.error('[reader] readerRef still null after 1s, abort render')
+    error.value = '阅读器容器未就绪'
+    return
+  }
+  console.log('[reader] renderReader start, format =', book.value?.file_format, 'el =', readerRef.value.tagName, readerRef.value.clientWidth, 'x', readerRef.value.clientHeight)
   // 应用阅读偏好
   reader.applyTo(readerRef.value)
 
   const format = book.value!.file_format
-  if (format === 'txt') {
-    await renderTxt()
-  } else if (format === 'epub') {
-    await renderEpub()
-  } else if (format === 'pdf') {
-    await renderPdf()
-  } else {
-    error.value = '暂不支持的格式: ' + format
+  try {
+    if (format === 'txt') {
+      console.log('[reader] -> renderTxt')
+      await renderTxt()
+    } else if (format === 'epub') {
+      console.log('[reader] -> renderEpub')
+      await renderEpub()
+    } else if (format === 'pdf') {
+      console.log('[reader] -> renderPdf')
+      await renderPdf()
+    } else {
+      console.log('[reader] -> unsupported format:', format)
+      error.value = '暂不支持的格式: ' + format
+    }
+    console.log('[reader] renderReader complete')
+  } catch (e: any) {
+    console.error('[reader] renderReader caught:', e)
+    error.value = e?.message ?? String(e)
   }
 }
 
