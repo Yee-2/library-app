@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
+import { onActivated, onDeactivated } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { getBook, getMyBookFileUrl, upsertProgress, getProgress, listBookmarks, addBookmark, deleteBookmark, listNotes, addNote, deleteNote, reportReadingHeartbeat } from '@/lib/books'
 import { useReaderStore } from '@/stores/reader'
@@ -42,10 +43,14 @@ const ttsIndex = ref(0)
 
 // 阅读进度保存防抖
 let progressTimer: any
+let onResize: (() => void) | null = null
 
 onMounted(async () => {
   try {
     // 加载已解锁的成就
+    onResize = () => { try { epubRendition?.resize() } catch {} }
+    window.addEventListener('resize', onResize)
+
     ach.init().then(() => ach.checkAll())
     ach.lastHeartbeat = Date.now()
     const loaded = await getBook(bookId.value)
@@ -163,6 +168,11 @@ async function renderEpub() {
   await book.ready
   const saved = await getProgress(bookId.value)
   await rendition.display(saved?.cfi || undefined)
+
+  // 容器尺寸可能在 display 时尚未稳定，强制重排
+  await nextTick()
+  try { rendition.resize() } catch {}
+  requestAnimationFrame(() => { try { rendition.resize() } catch {} })
   // 应用偏好样式
   rendition.hooks.content.register((contents: any) => {
     const css = `
@@ -274,6 +284,7 @@ function scheduleSaveProgress(cfi?: string, page?: number) {
 }
 
 onBeforeUnmount(() => {
+  if (onResize) window.removeEventListener('resize', onResize)
   if (epubRendition) { try { epubRendition.destroy() } catch {} }
   if (epubBook) { try { epubBook.destroy() } catch {} }
   stopTTS()
@@ -464,7 +475,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         else if (x > w * 2 / 3) book?.file_format === 'pdf' ? pdfNext() : txtNext()
       }
     }">
-      <div ref="readerRef" class="reader-area min-h-[60vh]"></div>
+      <div ref="readerRef" class="reader-area" style="height: calc(100vh - 120px); min-height: 480px;"></div>
     </div>
 
     <!-- 底部翻页（TXT / PDF） -->
