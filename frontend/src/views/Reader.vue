@@ -172,6 +172,20 @@ function applyTxtPage() {
 
 function txtPrev() { if (txtPage.value > 0) { txtPage.value--; applyTxtPage() } }
 function txtNext() { if (txtPage.value < txtTotalPages.value - 1) { txtPage.value++; applyTxtPage() } }
+function epubPrev() { try { epubRendition?.prev() } catch (e) { console.error(e) } }
+function epubNext() { try { epubRendition?.next() } catch (e) { console.error(e) } }
+function prevPage() {
+  if (!book.value) return
+  if (book.value.file_format === 'epub') epubPrev()
+  else if (book.value.file_format === 'pdf') pdfPrev()
+  else txtPrev()
+}
+function nextPage() {
+  if (!book.value) return
+  if (book.value.file_format === 'epub') epubNext()
+  else if (book.value.file_format === 'pdf') pdfNext()
+  else txtNext()
+}
 
 function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
@@ -210,12 +224,20 @@ async function renderEpub() {
   const book: any = ePub(bookInput)
   epubBook = book
 
+  // 关键配置：
+  //   spread: 'none'        —— 单页（移动端必须）
+  //   flow: 'paginated'     —— 单页分页
+  //   manager: 'continuous' —— 窄屏翻页更稳，next()/prev() 正常
+  //   snap: true            —— 翻页对齐
+  //   allowScriptedContent  —— 允许 epub 内的脚本（MathJax 等）
   const rendition: any = book.renderTo(readerRef.value, {
     width: '100%',
     height: '100%',
     spread: 'none',
-    manager: 'default',
     flow: 'paginated',
+    manager: 'continuous',
+    snap: true,
+    allowScriptedContent: true,
   })
   epubRendition = rendition
 
@@ -224,6 +246,34 @@ async function renderEpub() {
   rendition.on?.('displayed', () => console.log('[reader] rendition displayed'))
   rendition.on?.('rendered', (_section: any, view: any) => console.log('[reader] rendition rendered, view =', view?.nodeName))
   rendition.on?.('layout', (_layout: any) => console.log('[reader] rendition layout'))
+  rendition.on?.('relocated', (loc: any) => console.log('[reader] relocated ->', loc?.start?.index, loc?.start?.href))
+
+  // 翻页：键盘左右 / 触摸
+  window.addEventListener('keydown', (e) => {
+    if (!epubRendition) return
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp')  epubRendition.prev()
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') epubRendition.next()
+  }, { passive: true })
+
+  if (readerRef.value) {
+    let touchStartX = 0
+    readerRef.value.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0]?.clientX ?? 0
+    }, { passive: true })
+    readerRef.value.addEventListener('touchend', (e) => {
+      if (!epubRendition) return
+      const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX
+      if (Math.abs(dx) < 40) {
+        const x = e.changedTouches[0]?.clientX ?? 0
+        const w = readerRef.value?.clientWidth ?? 0
+        if (x < w / 2) epubRendition.prev(); else epubRendition.next()
+      } else if (dx < -40) {
+        epubRendition.next()
+      } else if (dx > 40) {
+        epubRendition.prev()
+      }
+    }, { passive: true })
+  }
 
   try {
     await Promise.race([
@@ -546,28 +596,35 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <div v-else class="flex-1 overflow-auto" @click="(e) => {
       const x = e.offsetX; const w = (e.currentTarget as HTMLElement).clientWidth
       if (w < 768) {
-        if (x < w / 3) book?.file_format === 'pdf' ? pdfPrev() : txtPrev()
-        else if (x > w * 2 / 3) book?.file_format === 'pdf' ? pdfNext() : txtNext()
+        if (x < w / 3) prevPage()
+        else if (x > w * 2 / 3) nextPage()
       }
     }">
       <div ref="readerRef" class="reader-area" style="height: calc(100vh - 120px); min-height: 480px;"></div>
     </div>
 
-    <!-- 底部翻页（TXT / PDF） -->
+    <!-- 底部翻页 -->
     <footer
-      v-if="!loading && !error && book && (book.file_format === 'txt' || book.file_format === 'pdf')"
+      v-if="!loading && !error && book"
       class="sticky bottom-0 bg-white/95 backdrop-blur border-t border-slate-200 py-2"
     >
       <div class="max-w-4xl mx-auto px-4 flex items-center justify-between text-sm">
         <button
-          @click="book.file_format === 'pdf' ? pdfPrev() : txtPrev()"
+          @click="epubPrev()"
+          :disabled="book.file_format === 'epub' && !epubRendition"
           class="btn-secondary"
         >上一页</button>
         <span class="text-slate-500">
-          第 {{ book.file_format === 'pdf' ? (txtPage + 1) : (txtPage + 1) }} / {{ txtTotalPages }} 页
+          <template v-if="book.file_format === 'epub'">
+            {{ Math.round(progressPct) }}%
+          </template>
+          <template v-else>
+            第 {{ txtPage + 1 }} / {{ txtTotalPages }} 页
+          </template>
         </span>
         <button
-          @click="book.file_format === 'pdf' ? pdfNext() : txtNext()"
+          @click="epubNext()"
+          :disabled="book.file_format === 'epub' && !epubRendition"
           class="btn-secondary"
         >下一页</button>
       </div>
