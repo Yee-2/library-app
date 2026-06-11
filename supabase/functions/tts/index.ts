@@ -1,14 +1,11 @@
 // supabase/functions/tts/index.ts
-// AI 听书 Edge Function - 调用 MiniMax M3 TTS 接口
-// 部署：supabase functions deploy tts --no-verify-jwt
-
-import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+// AI TTS Edge Function - calls MiniMax M3 TTS API
+// Deploy: supabase functions deploy tts --no-verify-jwt
 
 const MINIMAX_API_KEY = Deno.env.get("MINIMAX_API_KEY") ?? "";
 const MINIMAX_TTS_URL = Deno.env.get("MINIMAX_TTS_URL") ?? "https://api.minimaxi.chat/v1/t2a_v2";
 const MINIMAX_GROUP_ID = Deno.env.get("MINIMAX_GROUP_ID") ?? "";
 
-// CORS 头
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -16,8 +13,8 @@ const corsHeaders = {
   "Access-Control-Max-Age": "86400",
 };
 
-serve(async (req) => {
-  // 处理预检
+Deno.serve(async (req) => {
+  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -30,13 +27,13 @@ serve(async (req) => {
   }
 
   try {
-    // 1. 鉴权：要求用户登录
+    // Auth: require user login
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return json({ error: "Missing authorization header" }, 401);
     }
 
-    // 2. 解析请求体
+    // Parse request body
     const { text, voice = "male-qn-jingying", speed = 1.0, format = "mp3" } = await req.json();
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
@@ -51,7 +48,7 @@ serve(async (req) => {
       return json({ error: "TTS service not configured" }, 500);
     }
 
-    // 3. 调用 MiniMax TTS
+    // Call MiniMax TTS
     const ttsBody = {
       model: "speech-01-turbo",
       text: text.slice(0, 5000),
@@ -92,7 +89,7 @@ serve(async (req) => {
       );
     }
 
-    // 4. MiniMax 返回 JSON，audio 字段是 hex 编码的音频
+    // MiniMax returns JSON with hex-encoded audio
     const data = await ttsRes.json();
 
     if (data.base_resp && data.base_resp.status_code !== 0) {
