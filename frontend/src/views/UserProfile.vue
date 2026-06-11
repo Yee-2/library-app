@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  getUserProfile, listUserPublicBooks, isFollowing, followUser, unfollowUser, listReviews, upsertReview
+  getUserProfile, listUserPublicBooks, isFollowing, followUser, unfollowUser
 } from '@/lib/books'
 import { useAuthStore } from '@/stores/auth'
 
@@ -15,12 +15,8 @@ const profile = ref<any>(null)
 const stats = ref<any>(null)
 const achievements = ref<any[]>([])
 const books = ref<any[]>([])
-const reviews = ref<any[]>([])
 const following = ref(false)
 const loading = ref(false)
-const showReviewFor = ref<string | null>(null)
-const reviewRating = ref(5)
-const reviewContent = ref('')
 
 async function refresh() {
   loading.value = true
@@ -55,23 +51,6 @@ async function toggleFollow() {
 
 function readBook(b: any) {
   router.push(`/book/${b.id}`)
-}
-
-function openReviewFor(bookId: string) {
-  showReviewFor.value = bookId
-  reviewRating.value = 5
-  reviewContent.value = ''
-}
-
-async function submitReview() {
-  if (!showReviewFor.value) return
-  try {
-    await upsertReview(showReviewFor.value, reviewRating.value, reviewContent.value)
-    showReviewFor.value = null
-    alert('已发布书评')
-  } catch (e: any) {
-    alert('发布失败：' + e.message)
-  }
 }
 
 const isMe = computed(() => auth.user?.id === userId.value)
