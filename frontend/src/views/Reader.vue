@@ -282,14 +282,17 @@ async function renderEpub() {
   const book: any = ePub(bookInput)
   epubBook = book
 
-  // 关键配置：不用 continuous（epubjs 0.3.93 有 layout bug，view 高度变 0）
-  // 改用 default paginated（一次只显示一页）
+  // 关键配置：continuous + allowScriptedContent
+  // allowScriptedContent 恢复 iframe sandbox 中的 allow-scripts（否则 JS 脚本被阻止）
+  // locations.generate 已移到 display() 之后异步执行，不会破坏 layout
   const rendition: any = book.renderTo(readerRef.value, {
     width: '100%',
     height: '100%',
     spread: 'none',
     flow: 'paginated',
+    manager: 'continuous',
     snap: true,
+    allowScriptedContent: true,
   })
   epubRendition = rendition
 
