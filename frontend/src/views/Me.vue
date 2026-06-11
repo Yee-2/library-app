@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, onActivated, computed } from 'vue'
+import { ref, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { listMyAchievements, listAllAchievements, listMyFavorites, listMyBooks, getMyReadingSummary } from '@/lib/books'
-import { supabase } from '@/lib/supabase'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -44,7 +43,6 @@ async function refresh() {
     for (let i = 0; i < 60; i++) {
       const d = new Date(now); d.setDate(now.getDate() - i)
       if (dates.has(d.toISOString().slice(0, 10))) s++
-      else if (i > 0) break
       else break
     }
     streak.value = s
@@ -110,7 +108,7 @@ function openMyProfile() {
           <div class="text-xs text-white/70">今日阅读</div>
         </div>
         <div>
-          <div class="text-2xl font-bold">🔥 {{ streak }}</div>
+          <div class="text-2xl font-bold">{{ streak > 0 ? '🔥 ' + streak : streak }}</div>
           <div class="text-xs text-white/70">连读天数</div>
         </div>
       </div>
