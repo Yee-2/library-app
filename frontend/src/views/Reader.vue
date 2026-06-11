@@ -296,17 +296,13 @@ async function renderEpub() {
   const book: any = ePub(bookInput)
   epubBook = book
 
-  // 关键配置：
-  //   spread: 'none'        —— 单页（移动端必须）
-  //   flow: 'paginated'     —— 单页分页
-  //   manager: 'continuous' —— 窄屏翻页更稳，next()/prev() 正常
-  //   snap: true            —— 翻页对齐
+  // 关键配置：不用 continuous（epubjs 0.3.93 有 layout bug，view 高度变 0）
+  // 改用 default paginated（一次只显示一页）
   const rendition: any = book.renderTo(readerRef.value, {
     width: '100%',
     height: '100%',
     spread: 'none',
     flow: 'paginated',
-    manager: 'continuous',
     snap: true,
   })
   epubRendition = rendition
@@ -410,19 +406,6 @@ async function renderEpub() {
     console.error('[reader]', e)
   }
 
-  // 生成 location —— 否则 percentageFromCfi 永远返回 0，进度条一直显示 0%
-  try {
-    await book.locations.generate(1024)
-    console.log('[reader] locations generated, total =', book.locations.length?.())
-  } catch (e) {
-    console.warn('[reader] locations.generate failed (EPUB 可能没流式内容)', e)
-  }
-
-  // locations.generate 会改变布局，必须 resize + 重新 display
-  try { rendition.resize() } catch (e) { console.warn('[reader] resize failed', e) }
-  await new Promise(r => requestAnimationFrame(r))
-  try { rendition.resize() } catch {}
-
   const saved = await getProgress(bookId.value)
   try {
     await rendition.display(saved?.cfi || undefined)
@@ -430,6 +413,14 @@ async function renderEpub() {
   } catch (e) {
     console.error('[reader] display error', e)
   }
+
+  // 异步生成 location（不 await，不阻塞 display）
+  // 注意：必须在 display() 之后调用，否则会破坏 layout 导致 view 高度变 0
+  book.locations.generate(1024).then(() => {
+    console.log('[reader] locations generated, total =', book.locations.length?.())
+  }).catch((e: any) => {
+    console.warn('[reader] locations.generate failed', e)
+  })
 
   await nextTick()
   try { rendition.resize() } catch {}
