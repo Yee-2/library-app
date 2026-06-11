@@ -330,13 +330,15 @@ async function renderEpub() {
         try {
           const doc = iframe.contentDocument || iframe.contentWindow?.document
           if (!doc) return
-          let style = doc.getElementById('reader-static-style') as HTMLStyleElement | null
+          let style: HTMLStyleElement | null = doc.getElementById('reader-static-style') as HTMLStyleElement | null
           if (!style) {
             style = doc.createElement('style')
-            style.id = 'reader-static-style'
-            doc.head?.appendChild(style)
+            if (style) {
+              style.id = 'reader-static-style'
+              doc.head?.appendChild(style)
+            }
           }
-          style.textContent = css
+          if (style) style.textContent = css
         } catch {}
       })
     }
