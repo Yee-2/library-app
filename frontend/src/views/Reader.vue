@@ -264,20 +264,6 @@ async function renderEpub() {
   if (!readerRef.value) return
   readerRef.value.innerHTML = ''
 
-  // 强制给容器和父容器设置高度 —— flex 子项 height: 100% 必须父级有明确高度
-  // 否则 epubjs 渲染时容器为 0 高度，导致内容看不到
-  const parent = readerRef.value.parentElement
-  if (parent) {
-    const ph = parent.clientHeight
-    if (ph < 100) {
-      // 父容器还没拿到高度（异步 layout），用 viewport 兜底
-      parent.style.height = `${window.innerHeight - 120}px`
-    }
-    parent.style.minHeight = '480px'
-  }
-  readerRef.value.style.height = '100%'
-  readerRef.value.style.width = '100%'
-
   // 直接把 epub 作为 ArrayBuffer 喂给 epubjs，避开：
   //   1) signedUrl 经过 CDN 后 Content-Type 错乱
   //   2) blob: URL 走 epubjs 内部的 XHR 失败（0.3.93 已知问题：Cannot load book at blob:...）
@@ -312,49 +298,6 @@ async function renderEpub() {
 
   book.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
   book.on?.('closed', () => console.log('[reader] book closed'))
-  rendition.on?.('displayed', () => {
-    console.log('[reader] rendition displayed, contents.length =', rendition.contents?.length)
-    // displayed 之后给所有 iframe 注入一次 CSS（不持续监听，避免循环）
-    const injectCss = () => {
-      const iframes = readerRef.value?.querySelectorAll('iframe') || []
-      const theme = reader.theme()
-      const css = `
-        body { background: ${theme.bg} !important; color: ${theme.color} !important; }
-        a { color: inherit !important; }
-      `
-      iframes.forEach((iframe: any) => {
-        try {
-          const doc = iframe.contentDocument || iframe.contentWindow?.document
-          if (!doc) return
-          let style: HTMLStyleElement | null = doc.getElementById('reader-static-style') as HTMLStyleElement | null
-          if (!style) {
-            style = doc.createElement('style')
-            if (style) {
-              style.id = 'reader-static-style'
-              doc.head?.appendChild(style)
-            }
-          }
-          if (style) style.textContent = css
-        } catch {}
-      })
-    }
-    injectCss()
-    setTimeout(() => {
-      injectCss()
-      try {
-        const iframe = readerRef.value?.querySelector('iframe')
-        if (iframe) {
-          const doc = iframe.contentDocument || iframe.contentWindow?.document
-          console.log('[reader-debug] body text =', doc?.body?.textContent?.slice(0, 200))
-          console.log('[reader-debug] iframe =', iframe.clientWidth, 'x', iframe.clientHeight)
-          const cs = doc?.body ? getComputedStyle(doc.body) : null
-          console.log('[reader-debug] color=', cs?.color, 'bg=', cs?.background?.slice(0, 50))
-        } else {
-          console.warn('[reader-debug] no iframe')
-        }
-      } catch (e) { console.warn('[reader-debug] failed', e) }
-    }, 500)
-  })
   rendition.on?.('relocated', (loc: any) => console.log('[reader] relocated ->', loc?.start?.index, loc?.start?.href))
 
   // 翻页：键盘左右 / 触摸
@@ -457,12 +400,6 @@ async function renderEpub() {
       }).then((n) => notes.value.unshift(n))
     }
   })
-}
-
-// 应用 epub 字号（唯一稳定的 themes API）
-function applyEpubFontSize(rendition: any) {
-  if (!rendition) return
-  try { rendition.themes.fontSize(`${reader.fontSize}px`) } catch {}
 }
 
 async function renderPdf() {
@@ -735,7 +672,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col">
+  <div class="h-screen flex flex-col overflow-hidden">
     <!-- 顶部工具栏 -->
     <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
       <div class="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between gap-2">
