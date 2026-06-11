@@ -46,10 +46,10 @@ async function borrow() {
     const res = await fetch(url)
     const blob = await res.blob()
     const file = new File([blob], `${book.value.title}.${book.value.file_format}`, { type: blob.type })
-    const { uploadBook } = await import('@/lib/books')
     await uploadBook(file, { title: book.value.title, author: book.value.author, description: book.value.description })
     router.push('/library')
   } catch (e: any) {
+    console.error('[borrow]', e)
     alert('借阅失败：' + e.message)
   } finally {
     actionLoading.value = false

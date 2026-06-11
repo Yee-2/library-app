@@ -289,9 +289,11 @@ export async function toggleFavorite(bookId: string, isFavorite: boolean) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('未登录')
   if (isFavorite) {
-    await supabase.from('favorites').delete().eq('user_id', user.id).eq('book_id', bookId)
+    const { error } = await supabase.from('favorites').delete().eq('user_id', user.id).eq('book_id', bookId)
+    if (error) throw error
   } else {
-    await supabase.from('favorites').insert({ user_id: user.id, book_id: bookId })
+    const { error } = await supabase.from('favorites').insert({ user_id: user.id, book_id: bookId })
+    if (error) throw error
   }
 }
 
@@ -354,9 +356,12 @@ export async function listActivityFeed(limit = 50) {
   if (user) {
     const { data: following } = await supabase.from('follows').select('followee_id').eq('follower_id', user.id)
     const ids = (following ?? []).map((r: any) => r.followee_id)
+    // Postgres 的 `IN ()` 是语法错误；没关注任何人时直接返回空数组
     if (ids.length > 0) query = query.in('user_id', ids)
+    else return []
   }
-  return (await query).data ?? []
+  const { data } = await query
+  return (data ?? []) as any[]
 }
 
 export async function getUserProfile(userId: string) {

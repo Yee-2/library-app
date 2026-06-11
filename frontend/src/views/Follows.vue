@@ -16,6 +16,7 @@ const list = ref<any[]>([])
 const loading = ref(false)
 
 async function refresh() {
+  if (!userId.value) return
   loading.value = true
   try {
     if (type.value === 'followers') {

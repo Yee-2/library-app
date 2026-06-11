@@ -14,43 +14,48 @@ const bookCount = ref(0)
 const todaySeconds = ref(0)
 const totalSeconds = ref(0)
 const streak = ref(0)
+const loadError = ref('')
 
 async function refresh() {
   if (!auth.isLoggedIn) return
-  const [mine, all, favs, books, summary] = await Promise.all([
-    listMyAchievements(),
-    listAllAchievements(),
-    listMyFavorites(),
-    listMyBooks(),
-    getMyReadingSummary(365),
-  ])
-  allAch.value = all
-  achievements.value = mine
-  favorites.value = favs
-  bookCount.value = books.length
-  totalSeconds.value = summary.reduce((s: number, r: any) => s + r.total_seconds, 0)
-  const today = new Date().toISOString().slice(0, 10)
-  const todayRow = summary.find((r: any) => r.stat_date === today)
-  todaySeconds.value = todayRow?.total_seconds || 0
+  loadError.value = ''
+  try {
+    const [mine, all, favs, books, summary] = await Promise.all([
+      listMyAchievements(),
+      listAllAchievements(),
+      listMyFavorites(),
+      listMyBooks(),
+      getMyReadingSummary(365),
+    ])
+    allAch.value = all
+    achievements.value = mine
+    favorites.value = favs
+    bookCount.value = books.length
+    totalSeconds.value = summary.reduce((s: number, r: any) => s + r.total_seconds, 0)
+    const today = new Date().toISOString().slice(0, 10)
+    const todayRow = summary.find((r: any) => r.stat_date === today)
+    todaySeconds.value = todayRow?.total_seconds || 0
 
-  // 连读
-  const dates = new Set(summary.map((r: any) => r.stat_date))
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  let s = 0
-  for (let i = 0; i < 60; i++) {
-    const d = new Date(now); d.setDate(now.getDate() - i)
-    if (dates.has(d.toISOString().slice(0, 10))) s++
-    else if (i > 0) break
-    else break
+    // 连读
+    const dates = new Set(summary.map((r: any) => r.stat_date))
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    let s = 0
+    for (let i = 0; i < 60; i++) {
+      const d = new Date(now); d.setDate(now.getDate() - i)
+      if (dates.has(d.toISOString().slice(0, 10))) s++
+      else if (i > 0) break
+      else break
+    }
+    streak.value = s
+  } catch (e: any) {
+    console.error('[me]', e)
+    loadError.value = e?.message ?? '加载失败，请检查网络后重试'
   }
-  streak.value = s
 }
 
 onMounted(refresh)
 onActivated(refresh)
-
-const unlockedSet = computed(() => new Set(achievements.value.map((a: any) => a.achievement_id || a.achievement_id)))
 
 function fmtTime(sec: number) {
   const h = Math.floor(sec / 3600)
@@ -113,6 +118,7 @@ function openMyProfile() {
 
     <!-- 菜单列表 -->
     <div v-if="auth.isLoggedIn" class="space-y-2">
+      <div v-if="loadError" class="card p-4 text-center text-red-500 text-sm">{{ loadError }}</div>
       <div class="card divide-y divide-slate-100">
         <button @click="router.push('/library')" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
           <span class="text-xl">📚</span>

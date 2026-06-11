@@ -9,12 +9,18 @@ const q = ref('')
 const scope = ref<'public' | 'mine'>('public')
 const results = ref<any[]>([])
 const loading = ref(false)
+const error = ref('')
 
 const doSearch = debounce(async () => {
-  if (!q.value.trim()) { results.value = []; return }
+  if (!q.value.trim()) { results.value = []; error.value = ''; return }
   loading.value = true
+  error.value = ''
   try {
     results.value = await searchPublicBooksFulltext(q.value.trim())
+  } catch (e: any) {
+    console.error('[search]', e)
+    error.value = e?.message ?? '搜索失败，请重试'
+    results.value = []
   } finally {
     loading.value = false
   }
@@ -38,6 +44,7 @@ function go(b: any) { router.push(`/book/${b.id}`) }
     />
 
     <div v-if="loading" class="text-center text-slate-500 py-8">搜索中…</div>
+    <div v-else-if="error" class="text-center text-red-500 py-8">{{ error }}</div>
     <div v-else-if="q && results.length === 0" class="text-center text-slate-500 py-8">没找到相关结果</div>
     <div v-else class="space-y-2">
       <div v-for="b in results" :key="b.id" class="card p-3 flex items-center gap-3 cursor-pointer" @click="go(b)">
