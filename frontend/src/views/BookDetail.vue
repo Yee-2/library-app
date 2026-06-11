@@ -144,7 +144,7 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
           {{ actionLoading ? '借阅中…' : '📚 借阅到书架' }}
         </button>
         <button v-if="!isOwner" @click="download" class="btn-secondary">下载</button>
-        <button @click="fav" :class="isFav ? 'btn-secondary' : 'btn-secondary'">
+        <button @click="fav" :class="isFav ? 'btn-primary' : 'btn-secondary'">
           {{ isFav ? '★ 已收藏' : '☆ 收藏' }}
         </button>
       </div>
