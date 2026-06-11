@@ -66,6 +66,8 @@ onMounted(async () => {
     fileUrl.value = await getMyBookFileUrl(loaded)
     console.log('[reader] signed url =', fileUrl.value.slice(0, 80) + '...')
     await loadSideData()
+    // 关键：先翻 loading=false 让 <div ref="readerRef"> 挂上 DOM，再 renderReader
+    loading.value = false
     await renderReader()
     console.log('[reader] renderReader finished')
   } catch (e: any) {
@@ -96,14 +98,15 @@ const txtTotalPages = ref(1)
 const progressPct = ref(0)
 
 async function renderReader() {
-  // 等 readerRef 真正挂到 DOM 上 —— v-if/v-else 切到 v-else 时 ref 是后挂的
-  for (let i = 0; i < 20; i++) {
-    if (readerRef.value) break
+  // 等 readerRef 真正挂到 DOM 上 —— onMounted 翻 loading=false 后，v-else 分支的
+  // <div ref="readerRef"> 是下一帧才插入的；nextTick + 一次 RAF 足够
+  for (let i = 0; i < 5; i++) {
     await nextTick()
-    await new Promise(r => setTimeout(r, 50))
+    if (readerRef.value) break
+    await new Promise(r => requestAnimationFrame(r))
   }
   if (!readerRef.value) {
-    console.error('[reader] readerRef still null after 1s, abort render')
+    console.error('[reader] readerRef still null, abort render')
     error.value = '阅读器容器未就绪'
     return
   }
