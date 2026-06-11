@@ -180,6 +180,7 @@ async function renderEpub() {
     epubSrc = fileUrl.value
   }
 
+  console.debug('[reader] book source =', epubSrc.startsWith('blob:') ? 'blob:...' + epubSrc.slice(-8) : epubSrc)
   // epubjs: ePub(url) 返回的是 Book，必须 .renderTo(el) 拿 Rendition 才会渲染
   const book: any = ePub(epubSrc)
   epubBook = book
@@ -194,6 +195,10 @@ async function renderEpub() {
   epubRendition = rendition
 
   book.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
+  book.on?.('closed', () => console.debug('[reader] book closed'))
+  rendition.on?.('displayed', () => console.debug('[reader] rendition displayed'))
+  rendition.on?.('rendered', (_section: any, view: any) => console.debug('[reader] rendition rendered, view =', view?.nodeName))
+  rendition.on?.('layout', (_layout: any) => console.debug('[reader] rendition layout'))
 
   try {
     await Promise.race([
@@ -215,6 +220,8 @@ async function renderEpub() {
   setTimeout(() => { try { rendition.resize() } catch {} }, 200)
   setTimeout(() => { try { rendition.resize() } catch {} }, 800)
   console.debug('[reader] epub ready, container =', readerRef.value?.clientWidth, 'x', readerRef.value?.clientHeight)
+  console.debug('[reader] readerRef innerHTML length =', readerRef.value?.innerHTML.length)
+  console.debug('[reader] readerRef children =', readerRef.value?.children.length)
   // 应用偏好样式
   rendition.hooks.content.register((contents: any) => {
     const css = `
