@@ -97,6 +97,10 @@ const txtPageSize = 2000   // 每页字符数
 const txtTotalPages = ref(1)
 const progressPct = ref(0)
 
+// 目录：epub 从 navigation.toc 拿，txt 从正则识别章节标题
+const chapters = ref<Array<{ id: string; label: string; cfi?: string; index?: number }>>([])
+const showToc = ref(false)
+
 async function renderReader() {
   // 等 readerRef 真正挂到 DOM 上 —— onMounted 翻 loading=false 后，v-else 分支的
   // <div ref="readerRef"> 是下一帧才插入的；nextTick + 一次 RAF 足够
@@ -137,8 +141,6 @@ async function renderReader() {
 }
 
 async function renderTxt() {
-  // fetch 二进制再按 UTF-8 解码，避免 signedUrl 错误 Content-Type 导致
-  // res.text() 拿到空 / 乱码（控制台不报错但页面空白）
   const res = await fetch(fileUrl.value)
   if (!res.ok) {
     error.value = '下载失败：HTTP ' + res.status
@@ -149,6 +151,21 @@ async function renderTxt() {
   console.log('[reader] txt decoded length =', text.length, 'bytes =', buf.byteLength)
   txtContent.value = text
   txtTotalPages.value = Math.max(1, Math.ceil(text.length / txtPageSize))
+
+  // 自动识别章节标题（第N章 / 第N回 / 序章 / Chapter N 等）
+  const chRe = /^(?:\s*)(第[\d一-龥一二三四五六七八九十百千零两]+[章节回卷篇集部]|序章|序言|前言|楔子|尾声|番外|后记|Chapter\s+\d+|CHAPTER\s+\d+|CHAPTER\s+[IVX]+)/i
+  const rawLines = text.split(/\r?\n/)
+  const found: Array<{ id: string; label: string; index: number }> = []
+  let charPos = 0
+  for (let i = 0; i < rawLines.length; i++) {
+    if (chRe.test(rawLines[i])) {
+      found.push({ id: 'txt-ch-' + found.length, label: rawLines[i].trim().slice(0, 60), index: charPos })
+    }
+    charPos += rawLines[i].length + 1
+  }
+  chapters.value = found
+  console.log('[reader] txt chapters detected =', found.length)
+
   const prog = await getProgress(bookId.value)
   if (prog?.page) {
     txtPage.value = Math.min(prog.page, txtTotalPages.value - 1)
@@ -161,13 +178,45 @@ async function renderTxt() {
 function applyTxtPage() {
   if (!readerRef.value) return
   const start = txtPage.value * txtPageSize
-  const slice = txtContent.value.slice(start, start + txtPageSize)
+  // 向下找下一个空行结尾，避免切到半行
+  let slice = txtContent.value.slice(start, start + txtPageSize)
+  const nextBreak = slice.indexOf('\n\n', Math.max(0, slice.length - 500))
+  if (nextBreak > 0 && txtPage.value < txtTotalPages.value - 1) {
+    slice = slice.slice(0, nextBreak)
+  }
   readerRef.value.innerHTML = slice
     .split(/\n\s*\n/)
     .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
     .join('')
+  // 滚回顶部，避免从中间进入新一页还显示之前滚动位置
+  const scroller = (readerRef.value.parentElement as HTMLElement) || readerRef.value
+  if (scroller) scroller.scrollTop = 0
   progressPct.value = ((txtPage.value + 1) / txtTotalPages.value) * 100
   scheduleSaveProgress()
+}
+
+// 跳转到 txt 章节（按字符位置换算到对应 page）
+function jumpToChapter(index: number) {
+  const ch = chapters.value.find(c => c.index === index)
+  if (!ch) return
+  txtPage.value = Math.max(0, Math.floor((ch.index ?? 0) / txtPageSize))
+  applyTxtPage()
+  showToc.value = false
+}
+
+// 跳转到 epub 章节（通过 cfi）
+function gotoEpubChapter(ch: { cfi?: string; id?: string }) {
+  if (ch.cfi && epubRendition) {
+    epubRendition.display(ch.cfi)
+  } else {
+    try { epubRendition?.display() } catch {}
+    // 如果 cfi 不是合法的 epubjs cfi，尝试按 id 跳转
+    if (ch.id && epubBook) {
+      const spineItem = epubBook.spine?.get?.(ch.id)
+      if (spineItem) spineItem.load?.(epubRendition?.getView?.())
+    }
+  }
+  showToc.value = false
 }
 
 function txtPrev() { if (txtPage.value > 0) { txtPage.value--; applyTxtPage() } }
@@ -294,21 +343,46 @@ async function renderEpub() {
   try { rendition.resize() } catch {}
   setTimeout(() => { try { rendition.resize() } catch {} }, 200)
   setTimeout(() => { try { rendition.resize() } catch {} }, 800)
-  console.log('[reader] epub ready, container =', readerRef.value?.clientWidth, 'x', readerRef.value?.clientHeight)
-  console.log('[reader] readerRef innerHTML length =', readerRef.value?.innerHTML.length)
-  console.log('[reader] readerRef children =', readerRef.value?.children.length)
-  // 应用偏好样式
-  rendition.hooks.content.register((contents: any) => {
-    const css = `
-      body { font-family: ${reader.font().family} !important;
-             font-size: ${reader.fontSize}px !important;
-             line-height: ${reader.lineHeight}px !important;
-             color: ${reader.theme().color} !important;
-             background: ${reader.theme().bg} !important; }
-      a { color: inherit; }
-    `
-    contents.document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`)
+  // 应用主题 CSS 到所有 iframe：
+  //   hooks.content 只在当前页触发，但预渲染页的 iframe 不触发。
+  //   'rendered' 事件对所有 iframe 都触发，我们在这里注入 CSS。
+  const readerCss = () => `
+    body {
+      font-family: ${reader.font().family} !important;
+      font-size: ${reader.fontSize}px !important;
+      line-height: ${reader.lineHeight} !important;
+      color: ${reader.theme().color} !important;
+      background: ${reader.theme().bg} !important;
+    }
+    a { color: inherit; }
+  `
+  rendition.on('rendered', (_section: any, view: any) => {
+    const d = (view as any)?.document
+    if (!d) return
+    try {
+      const head = d.querySelector('head') || d.createElement('head')
+      let styleEl = head.querySelector('#reader-injected-style')
+      if (!styleEl) {
+        styleEl = d.createElement('style')
+        styleEl.id = 'reader-injected-style'
+        head.appendChild(styleEl)
+      }
+      styleEl.textContent = readerCss()
+    } catch { /* cross-origin iframe */ }
   })
+
+  // 目录：从 epub 取 navigation.toc
+  try {
+    const toc = book.navigation?.toc || []
+    chapters.value = (toc || []).map((item: any) => ({
+      id: item.id || item.href || '',
+      label: item.label || '(无标题)',
+      cfi: item.href || item.cfi || undefined,
+    }))
+    console.log('[reader] epub chapters =', chapters.value.length)
+  } catch (e) {
+    console.error('[reader] toc failed', e)
+  }
   rendition.on('relocated', (loc: any) => {
     const pct = book.locations?.percentageFromCfi?.(loc.start.cfi)
     progressPct.value = (typeof pct === 'number' ? pct : 0) * 100
@@ -579,6 +653,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           {{ book?.title || '加载中…' }}
         </div>
         <div class="flex items-center gap-1">
+          <button @click="showToc = !showToc" class="btn-ghost p-1.5" title="目录">📑</button>
           <button @click="showBookmarks = true" class="btn-ghost p-1.5" title="书签">🔖</button>
           <button @click="showNotes = true" class="btn-ghost p-1.5" title="笔记">📝</button>
           <button @click="showTTS = true; startTTS()" class="btn-ghost p-1.5" title="AI 听书">🔊</button>
@@ -787,5 +862,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <p class="text-xs text-slate-400 mt-3">由 MiniMax M3 TTS 提供支持</p>
       </div>
     </div>
+    </div>
+
+    <!-- 弹窗：目录 -->
+    <div v-if="showToc" class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" @click.self="showToc = false">
+      <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] flex flex-col">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="font-semibold">目录 ({{ chapters.length }})</h3>
+          <button @click="showToc = false" class="text-slate-400">✕</button>
+        </div>
+        <div v-if="chapters.length === 0" class="text-center text-slate-400 py-6 text-sm">暂无目录</div>
+        <div class="flex-1 overflow-auto space-y-1">
+          <div v-for="(ch, i) in chapters" :key="ch.id || i"
+               @click="book?.file_format === 'epub' ? gotoEpubChapter(ch) : jumpToChapter(ch.index!)"
+               class="card p-3 cursor-pointer hover:bg-slate-50 transition text-sm"
+               :title="ch.label">
+            <div class="truncate">{{ i + 1 }}. {{ ch.label }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
