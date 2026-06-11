@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onActivated, computed, nextTick } from 'vue'
 import { getMyReadingSummary, listMyBooks } from '@/lib/books'
-import { supabase } from '@/lib/supabase'
 
 const summary = ref<any[]>([])
 const books = ref<any[]>([])
