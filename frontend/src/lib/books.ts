@@ -24,17 +24,14 @@ export async function uploadBook(file: File, meta: {
   const format = detectFormat(file.name)
   if (!format) throw new Error('不支持的文件格式（仅支持 epub/pdf/txt/mobi）')
 
-  // 文件路径：{user_id}/{timestamp}-{filename}
   const safeName = file.name.replace(/[^\w.一-龥-]/g, '_')
   const filePath = `${user.id}/${Date.now()}-${safeName}`
 
-  // 1. 上传图书文件
   const { error: upErr } = await supabase.storage
     .from('book-files')
     .upload(filePath, file, { contentType: file.type || 'application/octet-stream' })
   if (upErr) throw upErr
 
-  // 2. 上传封面（可选）
   let coverUrl: string | null = null
   if (meta.coverFile) {
     const coverPath = `${user.id}/${Date.now()}-cover-${meta.coverFile.name}`
@@ -47,7 +44,6 @@ export async function uploadBook(file: File, meta: {
     }
   }
 
-  // 3. 写数据库
   const { data, error } = await supabase
     .from('books')
     .insert({
@@ -67,7 +63,6 @@ export async function uploadBook(file: File, meta: {
   return data as Book
 }
 
-/** 获取当前用户的所有书（书架） */
 export async function listMyBooks() {
   const { data, error } = await supabase
     .from('books')
@@ -77,7 +72,6 @@ export async function listMyBooks() {
   return data as Book[]
 }
 
-/** 公开书库（分页 + 搜索） */
 export async function listPublicBooks(opts: { q?: string; page?: number; pageSize?: number } = {}) {
   const page = opts.page ?? 0
   const pageSize = opts.pageSize ?? 20
@@ -88,7 +82,6 @@ export async function listPublicBooks(opts: { q?: string; page?: number; pageSiz
     .order('download_count', { ascending: false })
     .range(page * pageSize, page * pageSize + pageSize - 1)
   if (opts.q) {
-    // 全文检索
     query = query.or(`title.ilike.%${opts.q}%,author.ilike.%${opts.q}%`)
   }
   const { data, error } = await query
@@ -96,7 +89,6 @@ export async function listPublicBooks(opts: { q?: string; page?: number; pageSiz
   return data as (Book & { profiles: { username: string | null } | null })[]
 }
 
-/** 获取单本书 */
 export async function getBook(id: string) {
   const { data, error } = await supabase
     .from('books')
@@ -107,20 +99,16 @@ export async function getBook(id: string) {
   return data
 }
 
-/** 删除一本书 */
 export async function deleteBook(book: Book) {
-  // 1. 删 storage
   await supabase.storage.from('book-files').remove([book.file_url])
   if (book.cover_url) {
     const coverPath = book.cover_url.split('/book-covers/')[1]
     if (coverPath) await supabase.storage.from('book-covers').remove([coverPath])
   }
-  // 2. 删数据库
   const { error } = await supabase.from('books').delete().eq('id', book.id)
   if (error) throw error
 }
 
-/** 切换公开状态 */
 export async function togglePublic(book: Book) {
   const { error } = await supabase
     .from('books')
@@ -129,7 +117,6 @@ export async function togglePublic(book: Book) {
   if (error) throw error
 }
 
-/** 获取当前用户对某书的文件签名 URL（用于阅读） */
 export async function getMyBookFileUrl(book: Book) {
   const { data, error } = await supabase.storage
     .from('book-files')
@@ -138,7 +125,6 @@ export async function getMyBookFileUrl(book: Book) {
   return data.signedUrl
 }
 
-/** 获取公开书下载链接（通过 Edge Function） */
 export async function getPublicBookUrl(bookId: string) {
   const { data: { session } } = await supabase.auth.getSession()
   const res = await fetch(`${FUNCTIONS_URL}/public-book-url`, {
@@ -152,8 +138,6 @@ export async function getPublicBookUrl(bookId: string) {
   if (!res.ok) throw new Error('获取下载链接失败')
   return (await res.json()).url as string
 }
-
-// =============== 阅读进度 / 书签 / 笔记 ===============
 
 export async function upsertProgress(p: Omit<ReadingProgress, 'id' | 'user_id' | 'last_read_at'>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -221,4 +205,176 @@ export async function addNote(n: Omit<Note, 'id' | 'user_id' | 'created_at'>) {
 
 export async function deleteNote(id: string) {
   await supabase.from('notes').delete().eq('id', id)
+}
+
+// =============================================================
+// 第二、三阶段：统计 / 社区 / 关注 / 成就
+// =============================================================
+
+export async function reportReadingHeartbeat(bookId: string, seconds: number, words: number) {
+  if (seconds <= 0 && words <= 0) return
+  await supabase.rpc('aggregate_reading_session', {
+    p_book_id: bookId,
+    p_seconds: seconds,
+    p_words: words,
+  })
+}
+
+export async function getMyReadingSummary(days = 30) {
+  const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10)
+  const { data } = await supabase
+    .from('reading_stats')
+    .select('stat_date, total_seconds, total_words, sessions_count')
+    .gte('stat_date', since)
+    .order('stat_date', { ascending: true })
+  return data ?? []
+}
+
+export async function unlockAchievement(id: string) {
+  const { data } = await supabase.rpc('unlock_achievement', { p_id: id })
+  return !!data
+}
+
+export async function listMyAchievements() {
+  const { data } = await supabase
+    .from('user_achievements')
+    .select('*, achievements(*)')
+    .order('unlocked_at', { ascending: false })
+  return data ?? []
+}
+
+export async function listAllAchievements() {
+  const { data } = await supabase.from('achievements').select('*').order('threshold')
+  return (data ?? []) as Array<{ id: string; name: string; description: string; icon: string | null; threshold: number }>
+}
+
+export async function listReviews(bookId: string) {
+  const { data } = await supabase
+    .from('reviews')
+    .select('*, profiles(username, avatar_url)')
+    .eq('book_id', bookId)
+    .order('created_at', { ascending: false })
+  return (data ?? []) as any[]
+}
+
+export async function upsertReview(bookId: string, rating: number, content: string) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+  const { data, error } = await supabase
+    .from('reviews')
+    .upsert({ user_id: user.id, book_id: bookId, rating, content }, { onConflict: 'user_id,book_id' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function toggleFavorite(bookId: string, isFavorite: boolean) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+  if (isFavorite) {
+    await supabase.from('favorites').delete().eq('user_id', user.id).eq('book_id', bookId)
+  } else {
+    await supabase.from('favorites').insert({ user_id: user.id, book_id: bookId })
+  }
+}
+
+export async function listMyFavorites() {
+  const { data } = await supabase
+    .from('favorites')
+    .select('book_id, books(*, profiles(username))')
+    .order('created_at', { ascending: false })
+  return (data ?? []) as any[]
+}
+
+export async function followUser(userId: string) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+  if (user.id === userId) throw new Error('不能关注自己')
+  await supabase.from('follows').insert({ follower_id: user.id, followee_id: userId })
+}
+
+export async function unfollowUser(userId: string) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+  await supabase.from('follows').delete().eq('follower_id', user.id).eq('followee_id', userId)
+}
+
+export async function isFollowing(userId: string) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || user.id === userId) return false
+  const { data } = await supabase
+    .from('follows')
+    .select('follower_id')
+    .eq('follower_id', user.id)
+    .eq('followee_id', userId)
+    .maybeSingle()
+  return !!data
+}
+
+export async function listFollowers(userId: string) {
+  const { data } = await supabase
+    .from('follows')
+    .select('follower_id, profiles!follows_follower_id_fkey(username, avatar_url)')
+    .eq('followee_id', userId)
+  return (data ?? []) as any[]
+}
+
+export async function listFollowing(userId: string) {
+  const { data } = await supabase
+    .from('follows')
+    .select('followee_id, profiles!follows_followee_id_fkey(username, avatar_url)')
+    .eq('follower_id', userId)
+  return (data ?? []) as any[]
+}
+
+export async function listActivityFeed(limit = 50) {
+  const { data: { user } } = await supabase.auth.getUser()
+  let query = supabase
+    .from('activity')
+    .select('*, profiles(username, avatar_url)')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (user) {
+    const { data: following } = await supabase.from('follows').select('followee_id').eq('follower_id', user.id)
+    const ids = (following ?? []).map((r: any) => r.followee_id)
+    if (ids.length > 0) query = query.in('user_id', ids)
+  }
+  return (await query).data ?? []
+}
+
+export async function getUserProfile(userId: string) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle()
+  const { data: stats } = await supabase.rpc('get_user_stats', { p_user: userId })
+  const statsRow = Array.isArray(stats) && stats.length > 0 ? stats[0] : null
+  const { data: achievements } = await supabase
+    .from('user_achievements')
+    .select('*, achievements(*)')
+    .eq('user_id', userId)
+  return { profile, stats: statsRow, achievements: achievements ?? [] }
+}
+
+export async function listUserPublicBooks(userId: string) {
+  const { data } = await supabase
+    .from('books')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_public', true)
+    .order('updated_at', { ascending: false })
+  return (data ?? []) as any[]
+}
+
+export async function searchPublicBooksFulltext(q: string, limit = 30) {
+  const { data } = await supabase
+    .from('books')
+    .select('*, profiles(username)')
+    .eq('is_public', true)
+    .or(`title.ilike.%${q}%,author.ilike.%${q}%,description.ilike.%${q}%`)
+    .order('download_count', { ascending: false })
+    .limit(limit)
+  return (data ?? []) as any[]
 }

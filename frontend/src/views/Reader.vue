@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { getBook, getMyBookFileUrl, upsertProgress, getProgress, listBookmarks, addBookmark, deleteBookmark, listNotes, addNote, deleteNote } from '@/lib/books'
+import { getBook, getMyBookFileUrl, upsertProgress, getProgress, listBookmarks, addBookmark, deleteBookmark, listNotes, addNote, deleteNote, reportReadingHeartbeat } from '@/lib/books'
 import { useReaderStore } from '@/stores/reader'
-import { ttsSynthesize, splitSentences } from '@/lib/tts'
+import { ttsSynthesize, splitSentences, extractPdfText } from '@/lib/tts'
+import { useAchievementsStore } from '@/stores/achievements'
 import { FONT_OPTIONS, THEME_OPTIONS, TTS_VOICES } from '@/types'
 import type { Book, Bookmark, Note } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const reader = useReaderStore()
+const ach = useAchievementsStore()
 const bookId = computed(() => route.params.id as string)
 
 const book = ref<Book | null>(null)
@@ -43,12 +45,17 @@ let progressTimer: any
 
 onMounted(async () => {
   try {
-    book.value = await getBook(bookId.value)
-    if (book.value.user_id !== (await currentUserId())) {
+    // 加载已解锁的成就
+    ach.init().then(() => ach.checkAll())
+    ach.lastHeartbeat = Date.now()
+    const loaded = await getBook(bookId.value)
+    book.value = loaded
+    const me = await currentUserId()
+    if (loaded.user_id !== me) {
       error.value = '无权访问此书'
       return
     }
-    fileUrl.value = await getMyBookFileUrl(book.value)
+    fileUrl.value = await getMyBookFileUrl(loaded)
     await loadSideData()
     await renderReader()
   } catch (e: any) {
@@ -137,7 +144,7 @@ async function renderEpub() {
     epubBook = null
   }
   readerRef.value!.innerHTML = ''
-  const rendition = ePub(fileUrl.value)
+  const rendition: any = ePub(fileUrl.value)
   epubBook = rendition
   rendition.attachTo(readerRef.value!)
   const saved = await getProgress(bookId.value)
@@ -146,8 +153,8 @@ async function renderEpub() {
   rendition.hooks.content.register((contents: any) => {
     const css = `
       body { font-family: ${reader.font().family} !important;
-             font-size: ${reader.fontSize.value}px !important;
-             line-height: ${reader.lineHeight.value} !important;
+             font-size: ${reader.fontSize}px !important;
+             line-height: ${reader.lineHeight} !important;
              color: ${reader.theme().color} !important;
              background: ${reader.theme().bg} !important; }
       a { color: inherit; }
@@ -155,7 +162,7 @@ async function renderEpub() {
     contents.document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`)
   })
   rendition.on('relocated', (loc: any) => {
-    progressPct.value = (rendition.book.locations.percentageFromCfi(loc.start.cfi) || 0) * 100
+    progressPct.value = (rendition.book?.locations?.percentageFromCfi(loc.start.cfi) || 0) * 100
     scheduleSaveProgress(loc.start.cfi)
   })
   rendition.on('selected', (cfiRange: string, contents: any) => {
@@ -246,6 +253,8 @@ function scheduleSaveProgress(cfi?: string, page?: number) {
       page: page ?? (txtPage.value + 1),
       percentage: progressPct.value,
     }).catch(() => {})
+    // 心跳：每 30 秒上报一次阅读统计
+    ach.heartbeat(bookId.value, Math.round(progressPct.value * 5))
   }, 1500)
 }
 
@@ -282,7 +291,16 @@ async function startTTS() {
       text = '当前章节无法提取文本'
     }
   } else if (book.value?.file_format === 'pdf') {
-    text = 'PDF 听书功能暂不支持，请使用 TXT 或 EPUB 格式'
+    const pdf = (readerRef.value as any)?.__pdf
+    const cur = (readerRef.value as any)?.__currentPage || 1
+    if (!pdf) { alert('PDF 未就绪'); return }
+    showTTS.value = true
+    try {
+      text = await extractPdfText(fileUrl.value, cur, cur + 2)   // 读当前 + 后 2 页
+    } catch (e: any) {
+      alert('PDF 文本提取失败：' + e.message)
+      return
+    }
   }
   if (!text) {
     alert('没有可朗读的文本')

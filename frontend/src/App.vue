@@ -1,11 +1,23 @@
 <script setup lang="ts">
-import { RouterView, RouterLink, useRouter } from 'vue-router'
+import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { useAchievementsStore } from '@/stores/achievements'
+import TabBar from '@/components/TabBar.vue'
+import AchievementToast from '@/components/AchievementToast.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
+const ach = useAchievementsStore()
+
 const menuOpen = ref(false)
+
+const showTabBar = computed(() => !route.meta.hideTab)
+const userInitial = computed(() => {
+  const email = auth.user?.email
+  return email ? email[0].toUpperCase() : '?'
+})
 
 async function handleLogout() {
   await auth.signOut()
@@ -13,16 +25,18 @@ async function handleLogout() {
   router.push('/')
 }
 
-const userInitial = computed(() => {
-  const email = auth.user?.email
-  return email ? email[0].toUpperCase() : '?'
+onMounted(async () => {
+  if (auth.isLoggedIn) {
+    await ach.init()
+    ach.checkAll()
+  }
 })
 </script>
 
 <template>
   <div class="min-h-screen flex flex-col">
-    <!-- 顶部导航 -->
-    <header class="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-slate-200">
+    <!-- 顶部导航（仅在非 tab 页面显示） -->
+    <header v-if="!showTabBar" class="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-slate-200">
       <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
         <RouterLink to="/" class="flex items-center gap-2 text-brand-600 font-semibold">
           <img src="/favicon.svg" class="w-7 h-7" alt="logo" />
@@ -32,7 +46,7 @@ const userInitial = computed(() => {
         <nav class="flex items-center gap-1 text-sm">
           <RouterLink to="/" class="btn-ghost hidden sm:inline-flex">首页</RouterLink>
           <RouterLink to="/library" class="btn-ghost hidden sm:inline-flex">我的书架</RouterLink>
-          <RouterLink to="/store" class="btn-ghost hidden sm:inline-flex">在线书库</RouterLink>
+          <RouterLink to="/community" class="btn-ghost hidden sm:inline-flex">社区</RouterLink>
 
           <template v-if="auth.isLoggedIn">
             <div class="relative ml-2">
@@ -51,6 +65,8 @@ const userInitial = computed(() => {
                   {{ auth.user?.email }}
                 </div>
                 <RouterLink to="/library" class="block px-3 py-2 hover:bg-slate-50">我的书架</RouterLink>
+                <RouterLink to="/stats" class="block px-3 py-2 hover:bg-slate-50">阅读统计</RouterLink>
+                <RouterLink to="/achievements" class="block px-3 py-2 hover:bg-slate-50">成就</RouterLink>
                 <button
                   @click="handleLogout"
                   class="w-full text-left px-3 py-2 hover:bg-slate-50 text-red-600"
@@ -67,16 +83,24 @@ const userInitial = computed(() => {
       </div>
     </header>
 
-    <!-- 主体 -->
-    <main class="flex-1">
-      <RouterView v-slot="{ Component }">
+    <!-- 主体：tab 页面 keep-alive -->
+    <main class="flex-1" :class="{ 'pb-20': showTabBar }">
+      <RouterView v-slot="{ Component, route: r }">
         <transition name="fade" mode="out-in">
-          <component :is="Component" />
+          <keep-alive :include="['home','library','community','me']">
+            <component :is="Component" :key="r.fullPath" />
+          </keep-alive>
         </transition>
       </RouterView>
     </main>
 
-    <footer class="border-t border-slate-200 py-4 text-center text-xs text-slate-400">
+    <!-- 底部 TabBar -->
+    <TabBar v-if="showTabBar" />
+
+    <!-- 全局成就提示 -->
+    <AchievementToast />
+
+    <footer v-if="!showTabBar" class="border-t border-slate-200 py-4 text-center text-xs text-slate-400">
       © {{ new Date().getFullYear() }} 云端图书馆 · Powered by Supabase + Vercel
     </footer>
   </div>

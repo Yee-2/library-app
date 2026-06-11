@@ -100,6 +100,10 @@ async function handleTogglePublic(b: Book) {
   try {
     await togglePublic(b)
     await refresh()
+    // 公开书触发分享成就
+    const { useAchievementsStore } = await import('@/stores/achievements')
+    const ach = useAchievementsStore()
+    await ach.checkAll()
   } catch (e: any) {
     alert('操作失败：' + e.message)
   }
@@ -114,7 +118,12 @@ function readBook(b: Book) {
   <div class="max-w-6xl mx-auto px-4 py-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">我的书架</h1>
-      <button @click="showUpload = true" class="btn-primary">+ 导入图书</button>
+      <div class="flex items-center gap-2">
+        <button @click="router.push('/search')" class="btn-ghost p-2" title="搜索">🔍</button>
+        <button @click="router.push('/favorites')" class="btn-ghost p-2" title="收藏">⭐</button>
+        <button @click="router.push('/stats')" class="btn-ghost p-2" title="统计">📊</button>
+        <button @click="showUpload = true" class="btn-primary">+ 导入</button>
+      </div>
     </div>
 
     <div class="flex flex-wrap gap-2 mb-4">

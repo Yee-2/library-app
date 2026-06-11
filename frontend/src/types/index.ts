@@ -104,3 +104,85 @@ export const TTS_VOICES = [
   { id: 'audiobook_male_1',   name: '有声书·男' },
   { id: 'audiobook_female_1', name: '有声书·女' },
 ]
+
+// =============================================================
+// 第二阶段：阅读统计
+// =============================================================
+export interface ReadingSession {
+  id: number
+  user_id: string
+  book_id: string
+  started_at: string
+  duration_sec: number
+  words_read: number
+  created_at: string
+}
+
+export interface ReadingStat {
+  id: number
+  user_id: string
+  book_id: string
+  stat_date: string        // 'YYYY-MM-DD'
+  total_seconds: number
+  total_words: number
+  sessions_count: number
+}
+
+// =============================================================
+// 第三阶段：社区 / 关注 / 成就
+// =============================================================
+export interface Review {
+  id: string
+  user_id: string
+  book_id: string
+  rating: number           // 1~5
+  content: string | null
+  created_at: string
+  profiles?: { username: string | null; avatar_url: string | null } | null
+  books?: { title: string; cover_url: string | null } | null
+}
+
+export interface Follow {
+  follower_id: string
+  followee_id: string
+  created_at: string
+}
+
+export interface Activity {
+  id: string
+  user_id: string
+  type: 'book_shared' | 'review_added' | 'achievement'
+  ref_id: string | null
+  metadata: Record<string, any>
+  created_at: string
+  profiles?: { username: string | null; avatar_url: string | null } | null
+}
+
+export interface Achievement {
+  id: string
+  name: string
+  description: string
+  icon: string | null
+  threshold: number
+}
+
+export interface UserAchievement {
+  user_id: string
+  achievement_id: string
+  unlocked_at: string
+}
+
+export interface UserProfilePublic {
+  id: string
+  username: string | null
+  avatar_url: string | null
+  bio: string | null
+  created_at: string
+  stats?: {
+    books_count: number
+    total_seconds: number
+    followers_count: number
+    following_count: number
+    achievements_count: number
+  }
+}

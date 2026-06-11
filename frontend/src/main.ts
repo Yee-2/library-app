@@ -17,6 +17,13 @@ async function bootstrap() {
   await auth.init()
 
   app.mount('#app')
+
+  // 注册 Service Worker (PWA / 离线)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {})
+    })
+  }
 }
 
 bootstrap()
