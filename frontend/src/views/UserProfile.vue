@@ -2,7 +2,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  getUserProfile, listUserPublicBooks, isFollowing, followUser, unfollowUser
+  getUserProfile, listUserPublicBooks, isFollowing, followUser, unfollowUser,
+  uploadAvatar, updateMyProfile
 } from '@/lib/books'
 import { useAuthStore } from '@/stores/auth'
 
@@ -17,6 +18,13 @@ const achievements = ref<any[]>([])
 const books = ref<any[]>([])
 const following = ref(false)
 const loading = ref(false)
+
+// 头像 / 签名编辑
+const uploadingAvatar = ref(false)
+const editingBio = ref(false)
+const bioDraft = ref('')
+const savingBio = ref(false)
+const avatarFileInput = ref<HTMLInputElement | null>(null)
 
 async function refresh() {
   loading.value = true
@@ -54,6 +62,44 @@ function readBook(b: any) {
 }
 
 const isMe = computed(() => auth.user?.id === userId.value)
+
+// ---- 头像 ----
+async function onAvatarChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  uploadingAvatar.value = true
+  try {
+    const url = await uploadAvatar(file)
+    profile.value = { ...profile.value, avatar_url: url }
+  } catch (err: any) {
+    alert('上传失败：' + err.message)
+  } finally {
+    uploadingAvatar.value = false
+    if (avatarFileInput.value) avatarFileInput.value.value = ''
+  }
+}
+
+// ---- bio 编辑 ----
+function startEditBio() {
+  bioDraft.value = profile.value?.bio || ''
+  editingBio.value = true
+}
+function cancelEditBio() {
+  editingBio.value = false
+  bioDraft.value = ''
+}
+async function saveBio() {
+  savingBio.value = true
+  try {
+    const updated = await updateMyProfile({ bio: bioDraft.value })
+    profile.value = { ...profile.value, ...updated }
+    editingBio.value = false
+  } catch (e: any) {
+    alert('保存失败：' + e.message)
+  } finally {
+    savingBio.value = false
+  }
+}
 </script>
 
 <template>
@@ -68,12 +114,41 @@ const isMe = computed(() => auth.user?.id === userId.value)
       <!-- 头部 -->
       <div class="card p-5 mb-4">
         <div class="flex items-center gap-4">
-          <div class="w-16 h-16 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-2xl font-bold">
-            {{ (profile?.username || '?')[0].toUpperCase() }}
+          <div class="relative group">
+            <div class="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-2xl font-bold">
+              <img v-if="profile?.avatar_url" :src="profile.avatar_url" class="w-full h-full object-cover" alt="avatar" />
+              <span v-else>{{ (profile?.username || '?')[0].toUpperCase() }}</span>
+            </div>
+            <label v-if="isMe" class="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs opacity-0 group-hover:opacity-100 cursor-pointer rounded-full transition-opacity">
+              {{ uploadingAvatar ? '上传中…' : '更换' }}
+              <input
+                ref="avatarFileInput"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                :disabled="uploadingAvatar"
+                @change="onAvatarChange"
+              />
+            </label>
           </div>
           <div class="flex-1 min-w-0">
             <div class="font-bold text-lg">{{ profile?.username || '匿名用户' }}</div>
-            <div class="text-sm text-slate-500 mt-0.5">{{ profile?.bio || '这个人很懒，什么也没写' }}</div>
+            <div v-if="!editingBio" class="flex items-start gap-2 mt-0.5">
+              <span class="text-sm text-slate-500 flex-1">{{ profile?.bio || '这个人很懒，什么也没写' }}</span>
+              <button v-if="isMe" @click="startEditBio" class="text-xs text-brand-600 hover:underline flex-shrink-0">编辑</button>
+            </div>
+            <div v-else class="mt-1">
+              <textarea v-model="bioDraft" rows="2" maxlength="200" class="input text-sm" placeholder="说说你自己…" />
+              <div class="flex justify-between items-center mt-1">
+                <span class="text-xs text-slate-400">{{ bioDraft.length }} / 200</span>
+                <div class="flex gap-2">
+                  <button @click="cancelEditBio" class="text-xs btn-secondary px-2 py-1">取消</button>
+                  <button @click="saveBio" :disabled="savingBio" class="text-xs btn-primary px-2 py-1">
+                    {{ savingBio ? '保存中…' : '保存' }}
+                  </button>
+                </div>
+              </div>
+            </div>
             <div class="text-xs text-slate-400 mt-1">加入于 {{ new Date(profile?.created_at).toLocaleDateString('zh-CN') }}</div>
           </div>
           <button

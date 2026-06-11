@@ -1,5 +1,6 @@
 // src/router.ts
 import { createRouter, createWebHistory } from 'vue-router'
+import { watch } from 'vue'
 import { useAuthStore } from './stores/auth'
 
 export const router = createRouter({
@@ -32,9 +33,22 @@ export const router = createRouter({
   },
 })
 
-router.beforeEach((to) => {
-  if (to.meta.auth) {
-    const auth = useAuthStore()
-    if (!auth.isLoggedIn) return { name: 'login', query: { redirect: to.fullPath } }
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+  // 1) 等 auth 初次加载完成（避免刷新瞬间 isLoggedIn 误判为 false 跳登录）
+  if (auth.loading) {
+    await new Promise<void>((resolve) => {
+      const stop = watch(() => auth.loading, (v) => {
+        if (!v) { stop(); resolve() }
+      }, { immediate: true })
+    })
+  }
+  // 2) 已登录用户访问 /login → 跳到 /library（除非有 redirect 参数）
+  if (to.name === 'login' && auth.isLoggedIn && !to.query.redirect) {
+    return { name: 'library' }
+  }
+  // 3) 受保护路由未登录 → 跳登录
+  if (to.meta.auth && !auth.isLoggedIn) {
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
 })

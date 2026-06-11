@@ -152,8 +152,9 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
       <!-- 分享者 -->
       <div class="card p-3 mb-4 flex items-center gap-3 cursor-pointer"
            @click="book.profiles?.username && router.push(`/user/${book.user_id}`)">
-        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-sm font-medium">
-          {{ (book.profiles?.username || '?')[0].toUpperCase() }}
+        <div class="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-sm font-medium">
+          <img v-if="book.profiles?.avatar_url" :src="book.profiles.avatar_url" class="w-full h-full object-cover" alt="avatar" />
+          <span v-else>{{ (book.profiles?.username || '?')[0].toUpperCase() }}</span>
         </div>
         <div class="flex-1">
           <div class="text-sm font-medium">{{ book.profiles?.username || '匿名' }}</div>
@@ -188,8 +189,9 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
         <div v-else class="space-y-3">
           <div v-for="r in reviews" :key="r.id" class="border-b border-slate-100 last:border-0 pb-3 last:pb-0">
             <div class="flex items-center gap-2">
-              <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs">
-                {{ (r.profiles?.username || '?')[0].toUpperCase() }}
+              <div class="w-7 h-7 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center text-xs">
+                <img v-if="r.profiles?.avatar_url" :src="r.profiles.avatar_url" class="w-full h-full object-cover" alt="avatar" />
+                <span v-else>{{ (r.profiles?.username || '?')[0].toUpperCase() }}</span>
               </div>
               <span class="text-sm font-medium">{{ r.profiles?.username || '匿名' }}</span>
               <span class="text-amber-500 text-sm">{{ '★'.repeat(r.rating) }}</span>

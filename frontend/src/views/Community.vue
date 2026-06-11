@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
   listPublicBooks, listActivityFeed, searchPublicBooksFulltext,
-  getPublicBookUrl, uploadBook
+  getPublicBookUrl, listCommunityPosts, createPost, deletePost, togglePostLike,
+  type CommunityPost
 } from '@/lib/books'
 import { debounce } from '@/lib/utils'
 
@@ -17,12 +18,22 @@ const loading = ref(false)
 const feed = ref<any[]>([])
 const books = ref<any[]>([])
 const people = ref<any[]>([])   // 通过动态流里的 profiles 聚合
+const posts = ref<CommunityPost[]>([])
+
+// 发帖
+const postDraft = ref('')
+const posting = ref(false)
 
 async function refresh() {
   loading.value = true
   try {
     if (tab.value === 'feed') {
-      feed.value = await listActivityFeed(50)
+      const [activity, postList] = await Promise.all([
+        listActivityFeed(50),
+        listCommunityPosts({ limit: 30 }),
+      ])
+      feed.value = activity
+      posts.value = postList
       // 聚合动态流里出现的人
       const m = new Map<string, any>()
       feed.value.forEach((a: any) => {
@@ -48,7 +59,6 @@ onMounted(refresh)
 onActivated(refresh)
 
 function readBook(b: any) {
-  // 公开书详情页（统一入口）
   router.push(`/book/${b.id}`)
 }
 
@@ -84,6 +94,49 @@ function activityText(a: any) {
   if (a.type === 'achievement') return `解锁了成就`
   return '有动态'
 }
+
+// 发帖
+async function submitPost() {
+  if (!postDraft.value.trim() || !auth.isLoggedIn) return
+  posting.value = true
+  try {
+    const p = await createPost(postDraft.value)
+    posts.value = [p, ...posts.value]
+    postDraft.value = ''
+  } catch (e: any) {
+    alert('发布失败：' + e.message)
+  } finally {
+    posting.value = false
+  }
+}
+
+// 点赞（乐观更新）
+async function toggleLike(p: CommunityPost) {
+  if (!auth.isLoggedIn) { router.push('/login'); return }
+  // 乐观更新
+  const wasLiked = !!p.liked_by_me
+  p.liked_by_me = !wasLiked
+  p.like_count = (p.like_count ?? 0) + (p.liked_by_me ? 1 : -1)
+  try {
+    const r = await togglePostLike(p.id, wasLiked)
+    p.liked_by_me = r.liked
+  } catch (e: any) {
+    // 回滚
+    p.liked_by_me = wasLiked
+    p.like_count = (p.like_count ?? 0) + (p.liked_by_me ? 1 : -1)
+    alert(e.message)
+  }
+}
+
+async function deleteOwnPost(p: CommunityPost) {
+  if (!confirm('确定删除这条帖子？')) return
+  try {
+    await deletePost(p.id)
+    posts.value = posts.value.filter(x => x.id !== p.id)
+  } catch (e: any) {
+    alert('删除失败：' + e.message)
+  }
+}
 </script>
 
 <template>
@@ -113,16 +166,71 @@ function activityText(a: any) {
 
     <!-- 动态流 -->
     <div v-else-if="tab === 'feed'" class="space-y-2">
-      <div v-if="feed.length === 0" class="text-center text-slate-500 py-10">
-        还没有动态，去公开一本书或关注其他人吧
+      <!-- 发帖框（仅登录可见） -->
+      <div v-if="auth.isLoggedIn" class="card p-3">
+        <textarea
+          v-model="postDraft"
+          rows="3"
+          maxlength="2000"
+          placeholder="说点什么…（最多 2000 字）"
+          class="input resize-none"
+        />
+        <div class="flex justify-between items-center mt-2">
+          <span class="text-xs text-slate-400">{{ postDraft.length }} / 2000</span>
+          <button
+            :disabled="posting || !postDraft.trim()"
+            @click="submitPost"
+            class="btn-primary text-sm px-3 py-1 disabled:opacity-50"
+          >{{ posting ? '发布中…' : '发布' }}</button>
+        </div>
       </div>
-      <div v-for="a in feed" :key="a.id" class="card p-3 flex gap-3">
+
+      <!-- 用户自己发的帖子 -->
+      <div v-for="p in posts" :key="p.id" class="card p-3 flex gap-3">
         <div
-          class="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600
-                 text-white flex items-center justify-center text-sm font-medium cursor-pointer"
+          class="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-sm font-medium cursor-pointer flex-shrink-0"
+          @click="openUser(p.user_id)"
+        >
+          <img v-if="p.profiles?.avatar_url" :src="p.profiles.avatar_url" class="w-full h-full object-cover" alt="avatar" />
+          <span v-else>{{ (p.profiles?.username || '?')[0].toUpperCase() }}</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm flex items-center gap-2 flex-wrap">
+            <span class="font-medium cursor-pointer hover:underline" @click="openUser(p.user_id)">
+              {{ p.profiles?.username || '匿名' }}
+            </span>
+            <span class="text-xs text-slate-400">{{ timeAgo(p.created_at) }}</span>
+          </div>
+          <div class="text-sm text-slate-800 mt-1 whitespace-pre-wrap break-words">{{ p.content }}</div>
+          <!-- 附书 -->
+          <div v-if="p.books" class="mt-2 flex items-center gap-2 p-2 bg-slate-50 rounded text-xs cursor-pointer hover:bg-slate-100"
+               @click="p.book_id && router.push(`/book/${p.book_id}`)">
+            <img v-if="p.books.cover_url" :src="p.books.cover_url" class="w-8 h-10 object-cover rounded" alt="cover" />
+            <div v-else class="w-8 h-10 rounded bg-slate-200 flex items-center justify-center">📖</div>
+            <span class="line-clamp-1 flex-1">{{ p.books.title }}</span>
+          </div>
+          <div class="flex items-center gap-3 mt-2">
+            <button @click="toggleLike(p)" class="text-xs flex items-center gap-1 hover:opacity-70 transition">
+              <span :class="p.liked_by_me ? 'text-red-500' : 'text-slate-400'">{{ p.liked_by_me ? '♥' : '♡' }}</span>
+              <span :class="p.liked_by_me ? 'text-red-500' : 'text-slate-500'">{{ p.like_count ?? 0 }}</span>
+            </button>
+            <button v-if="auth.user?.id === p.user_id" @click="deleteOwnPost(p)" class="text-xs text-slate-400 hover:text-red-500 ml-auto">删除</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 自动生成的动态（来自 activity 表） -->
+      <div v-if="feed.length === 0 && posts.length === 0" class="text-center text-slate-500 py-10">
+        还没有动态，去公开一本书、关注其他人或发个帖吧
+      </div>
+      <div v-for="a in feed" :key="'act-' + a.id" class="card p-3 flex gap-3">
+        <div
+          class="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-brand-400 to-brand-600
+                 text-white flex items-center justify-center text-sm font-medium cursor-pointer flex-shrink-0"
           @click="openUser(a.user_id)"
         >
-          {{ (a.profiles?.username || '?')[0].toUpperCase() }}
+          <img v-if="a.profiles?.avatar_url" :src="a.profiles.avatar_url" class="w-full h-full object-cover" alt="avatar" />
+          <span v-else>{{ (a.profiles?.username || '?')[0].toUpperCase() }}</span>
         </div>
         <div class="flex-1 min-w-0">
           <div class="text-sm">
@@ -168,8 +276,9 @@ function activityText(a: any) {
     <div v-else-if="tab === 'people'" class="space-y-2">
       <div v-if="people.length === 0" class="text-center text-slate-500 py-8">还没看到人</div>
       <div v-for="p in people" :key="p.id" class="card p-3 flex items-center gap-3 cursor-pointer" @click="openUser(p.id)">
-        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center font-medium">
-          {{ (p.username || '?')[0].toUpperCase() }}
+        <div class="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center font-medium flex-shrink-0">
+          <img v-if="p.avatar_url" :src="p.avatar_url" class="w-full h-full object-cover" alt="avatar" />
+          <span v-else>{{ (p.username || '?')[0].toUpperCase() }}</span>
         </div>
         <div class="flex-1">
           <div class="font-medium text-sm">{{ p.username || '匿名' }}</div>

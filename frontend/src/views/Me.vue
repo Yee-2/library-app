@@ -2,7 +2,7 @@
 import { ref, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { listMyAchievements, listAllAchievements, listMyFavorites, listMyBooks, getMyReadingSummary } from '@/lib/books'
+import { listMyAchievements, listAllAchievements, listMyFavorites, listMyBooks, getMyReadingSummary, getUserProfile, uploadAvatar } from '@/lib/books'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -14,22 +14,27 @@ const todaySeconds = ref(0)
 const totalSeconds = ref(0)
 const streak = ref(0)
 const loadError = ref('')
+const myProfile = ref<any>(null)
+const uploadingAvatar = ref(false)
+const avatarInput = ref<HTMLInputElement | null>(null)
 
 async function refresh() {
   if (!auth.isLoggedIn) return
   loadError.value = ''
   try {
-    const [mine, all, favs, books, summary] = await Promise.all([
+    const [mine, all, favs, books, summary, profileData] = await Promise.all([
       listMyAchievements(),
       listAllAchievements(),
       listMyFavorites(),
       listMyBooks(),
       getMyReadingSummary(365),
+      getUserProfile(auth.user!.id).catch(() => ({ profile: null })),
     ])
     allAch.value = all
     achievements.value = mine
     favorites.value = favs
     bookCount.value = books.length
+    myProfile.value = profileData?.profile || null
     totalSeconds.value = summary.reduce((s: number, r: any) => s + r.total_seconds, 0)
     const today = new Date().toISOString().slice(0, 10)
     const todayRow = summary.find((r: any) => r.stat_date === today)
@@ -55,6 +60,21 @@ async function refresh() {
 onMounted(refresh)
 onActivated(refresh)
 
+async function onAvatarChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  uploadingAvatar.value = true
+  try {
+    const url = await uploadAvatar(file)
+    myProfile.value = { ...(myProfile.value || {}), avatar_url: url }
+  } catch (err: any) {
+    alert('上传失败：' + err.message)
+  } finally {
+    uploadingAvatar.value = false
+    if (avatarInput.value) avatarInput.value.value = ''
+  }
+}
+
 function fmtTime(sec: number) {
   const h = Math.floor(sec / 3600)
   const m = Math.floor((sec % 3600) / 60)
@@ -77,9 +97,23 @@ function openMyProfile() {
     <!-- 头部 -->
     <div class="card p-5 mb-3 bg-gradient-to-br from-brand-500 to-brand-700 text-white">
       <div class="flex items-center gap-3">
-        <div class="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold cursor-pointer"
-             @click="openMyProfile">
-          {{ (auth.user?.email || '?')[0].toUpperCase() }}
+        <div class="relative group w-14 h-14">
+          <div class="w-14 h-14 rounded-full bg-white/20 overflow-hidden flex items-center justify-center text-2xl font-bold cursor-pointer"
+               @click="openMyProfile">
+            <img v-if="myProfile?.avatar_url" :src="myProfile.avatar_url" class="w-full h-full object-cover" alt="avatar" />
+            <span v-else>{{ (auth.user?.email || '?')[0].toUpperCase() }}</span>
+          </div>
+          <label class="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-[10px] opacity-0 group-hover:opacity-100 cursor-pointer rounded-full transition-opacity">
+            {{ uploadingAvatar ? '…' : '更换' }}
+            <input
+              ref="avatarInput"
+              type="file"
+              accept="image/*"
+              class="hidden"
+              :disabled="uploadingAvatar"
+              @change="onAvatarChange"
+            />
+          </label>
         </div>
         <div class="flex-1 min-w-0">
           <div class="font-bold text-lg truncate" @click="openMyProfile">

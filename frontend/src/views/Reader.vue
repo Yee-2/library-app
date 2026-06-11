@@ -252,6 +252,20 @@ let epubBook: any = null
 let epubRendition: any = null
 let epubBlobUrl: string | null = null
 let epubKeyHandler: ((e: KeyboardEvent) => void) | null = null
+let touchStartHandler: ((e: TouchEvent) => void) | null = null
+let touchEndHandler: ((e: TouchEvent) => void) | null = null
+let isSwiping = false  // 滑动防抖：300ms 内只接受一次
+
+function detachSwipeListeners() {
+  if (touchStartHandler && readerRef.value) {
+    readerRef.value.removeEventListener('touchstart', touchStartHandler)
+  }
+  if (touchEndHandler && readerRef.value) {
+    readerRef.value.removeEventListener('touchend', touchEndHandler)
+  }
+  touchStartHandler = null
+  touchEndHandler = null
+}
 async function renderEpub() {
   // 动态导入 epubjs
   const ePub = (await import('epubjs')).default
@@ -314,33 +328,52 @@ async function renderEpub() {
   window.addEventListener('keydown', epubKeyHandler, { passive: true })
 
   if (readerRef.value) {
+    // 先清理可能残留的旧监听器（防止 re-render 堆积）
+    detachSwipeListeners()
     let touchStartX = 0
     let touchStartY = 0
-    readerRef.value.addEventListener('touchstart', (e) => {
+    touchStartHandler = (e: TouchEvent) => {
       touchStartX = e.changedTouches[0]?.clientX ?? 0
       touchStartY = e.changedTouches[0]?.clientY ?? 0
-    }, { passive: true })
-    readerRef.value.addEventListener('touchend', (e) => {
-      if (book.value?.file_format === 'epub' && epubRendition) {
-        const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX
-        const dy = (e.changedTouches[0]?.clientY ?? 0) - touchStartY
-        // 只在水平滑动占主导时才翻页，避免与垂直滚动冲突
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-          if (dx < -40) epubRendition.next()
-          else if (dx > 40) epubRendition.prev()
-        } else if (Math.abs(dx) < 40) {
-          // 点击
-          const x = e.changedTouches[0]?.clientX ?? 0
-          const w = readerRef.value?.clientWidth ?? 0
-          if (x < w / 2) epubRendition.prev(); else epubRendition.next()
-        }
-        return
-      }
-      // txt / pdf：左右滑翻页
+    }
+    touchEndHandler = (e: TouchEvent) => {
+      if (isSwiping) return  // 防抖：300ms 内忽略
+      if (!epubRendition) return
       const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX
-      if (dx < -40) nextPage()
-      else if (dx > 40) prevPage()
-    }, { passive: true })
+      const dy = (e.changedTouches[0]?.clientY ?? 0) - touchStartY
+      const format = book.value?.file_format
+      try {
+        if (format === 'epub') {
+          // 水平滑动占主导才翻页，避免和垂直滚动冲突
+          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+            isSwiping = true
+            setTimeout(() => { isSwiping = false }, 300)
+            if (dx < -40) epubRendition.next()
+            else if (dx > 40) epubRendition.prev()
+          } else if (Math.abs(dx) < 40) {
+            // 点击：左半屏 prev，右半屏 next
+            const x = e.changedTouches[0]?.clientX ?? 0
+            const w = readerRef.value?.clientWidth ?? 0
+            isSwiping = true
+            setTimeout(() => { isSwiping = false }, 300)
+            if (x < w / 2) epubRendition.prev()
+            else epubRendition.next()
+          }
+        } else {
+          // txt / pdf：左右滑翻页
+          if (Math.abs(dx) > 40) {
+            isSwiping = true
+            setTimeout(() => { isSwiping = false }, 300)
+            if (dx < -40) nextPage()
+            else if (dx > 40) prevPage()
+          }
+        }
+      } catch (err) {
+        console.error('[reader] swipe error', err)
+      }
+    }
+    readerRef.value.addEventListener('touchstart', touchStartHandler, { passive: true })
+    readerRef.value.addEventListener('touchend', touchEndHandler, { passive: true })
   }
 
   try {
@@ -512,6 +545,7 @@ function scheduleSaveProgress(cfi?: string, page?: number) {
 onBeforeUnmount(() => {
   if (onResize) window.removeEventListener('resize', onResize)
   if (epubKeyHandler) window.removeEventListener('keydown', epubKeyHandler)
+  detachSwipeListeners()
   if (epubRendition) { try { epubRendition.destroy() } catch {} }
   if (epubBook) { try { epubBook.destroy() } catch {} }
   if (epubBlobUrl) { URL.revokeObjectURL(epubBlobUrl); epubBlobUrl = null }

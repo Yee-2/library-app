@@ -158,6 +158,57 @@ export async function getPublicBookUrl(bookId: string) {
   return (await res.json()).url as string
 }
 
+// =============== 头像 / 资料编辑 ===============
+
+/** 上传头像到 avatars 桶，更新 profiles.avatar_url，返回带 cache-buster 的 URL */
+export async function uploadAvatar(file: File): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+  if (!file.type.startsWith('image/')) throw new Error('请选择图片文件')
+  if (file.size > 2 * 1024 * 1024) throw new Error('头像不能超过 2MB')
+
+  // ASCII key: <user_id>/<uuid>.<ext>
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+  const id = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  const path = `${user.id}/${id}.${ext}`
+
+  const { error: upErr } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type })
+  if (upErr) throw upErr
+
+  const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path)
+  // cache-buster 让旧头像立刻被新头像替换
+  const url = `${pub.publicUrl}?t=${Date.now()}`
+
+  const { error: updErr } = await supabase
+    .from('profiles')
+    .update({ avatar_url: url })
+    .eq('id', user.id)
+  if (updErr) throw updErr
+  return url
+}
+
+/** 更新自己的 profile（bio / username） */
+export async function updateMyProfile(updates: { bio?: string; username?: string }) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+  const clean: Record<string, any> = {}
+  if (typeof updates.bio === 'string') clean.bio = updates.bio.trim().slice(0, 200) || null
+  if (typeof updates.username === 'string') clean.username = updates.username.trim().slice(0, 30) || null
+  if (Object.keys(clean).length === 0) return null
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(clean)
+    .eq('id', user.id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function upsertProgress(p: Omit<ReadingProgress, 'id' | 'user_id' | 'last_read_at'>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
@@ -401,4 +452,99 @@ export async function searchPublicBooksFulltext(q: string, limit = 30) {
     .order('download_count', { ascending: false })
     .limit(limit)
   return (data ?? []) as any[]
+}
+
+// =============== 社区帖子 / 点赞 ===============
+
+export interface CommunityPost {
+  id: string
+  user_id: string
+  content: string
+  book_id: string | null
+  created_at: string
+  updated_at: string
+  profiles?: { username: string | null; avatar_url: string | null } | null
+  books?: { title: string; cover_url: string | null } | null
+  like_count?: number
+  liked_by_me?: boolean
+}
+
+/** 发布社区帖子 */
+export async function createPost(content: string, bookId?: string | null): Promise<CommunityPost> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+  const trimmed = content.trim()
+  if (!trimmed) throw new Error('内容不能为空')
+  if (trimmed.length > 2000) throw new Error('内容不能超过 2000 字')
+  const row = { user_id: user.id, content: trimmed, book_id: bookId || null }
+  const { data, error } = await supabase
+    .from('community_posts')
+    .insert(row)
+    .select('*, profiles!community_posts_user_id_profiles_fkey(username, avatar_url)')
+    .single()
+  if (error) throw error
+  return { ...data, like_count: 0, liked_by_me: false }
+}
+
+/** 删除自己的帖子 */
+export async function deletePost(postId: string) {
+  const { error } = await supabase.from('community_posts').delete().eq('id', postId)
+  if (error) throw error
+}
+
+/** 拉取社区帖子（含 like_count 和 liked_by_me） */
+export async function listCommunityPosts(opts: { limit?: number; before?: string } = {}): Promise<CommunityPost[]> {
+  const { data: { user } } = await supabase.auth.getUser()
+  let query = supabase
+    .from('community_posts')
+    .select(`
+      *,
+      profiles!community_posts_user_id_profiles_fkey(username, avatar_url),
+      books:book_id (title, cover_url)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(opts.limit ?? 30)
+  if (opts.before) query = query.lt('created_at', opts.before)
+  const { data, error } = await query
+  if (error) throw error
+  const posts = (data ?? []) as CommunityPost[]
+  if (posts.length === 0) return []
+  const ids = posts.map(p => p.id)
+  const { data: likes } = await supabase
+    .from('post_likes')
+    .select('post_id, user_id')
+    .in('post_id', ids)
+  const countMap = new Map<string, number>()
+  const mineSet = new Set<string>()
+  for (const l of (likes ?? []) as any[]) {
+    countMap.set(l.post_id, (countMap.get(l.post_id) ?? 0) + 1)
+    if (user && l.user_id === user.id) mineSet.add(l.post_id)
+  }
+  return posts.map(p => ({
+    ...p,
+    like_count: countMap.get(p.id) ?? 0,
+    liked_by_me: mineSet.has(p.id),
+  }))
+}
+
+/** 点赞 / 取消点赞 */
+export async function togglePostLike(postId: string, currentlyLiked: boolean): Promise<{ liked: boolean }> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('未登录')
+  if (currentlyLiked) {
+    const { error } = await supabase
+      .from('post_likes')
+      .delete()
+      .eq('post_id', postId)
+      .eq('user_id', user.id)
+    if (error) throw error
+    return { liked: false }
+  } else {
+    const { error } = await supabase
+      .from('post_likes')
+      .insert({ post_id: postId, user_id: user.id })
+    // 23505 = unique violation (already liked — treat as success)
+    if (error && error.code !== '23505') throw error
+    return { liked: true }
+  }
 }

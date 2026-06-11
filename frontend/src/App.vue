@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useAchievementsStore } from '@/stores/achievements'
+import { getUserProfile } from '@/lib/books'
 import TabBar from '@/components/TabBar.vue'
 import AchievementToast from '@/components/AchievementToast.vue'
 
@@ -12,6 +13,7 @@ const route = useRoute()
 const ach = useAchievementsStore()
 
 const menuOpen = ref(false)
+const myProfile = ref<any>(null)
 
 const showTabBar = computed(() => !route.meta.hideTab)
 const userInitial = computed(() => {
@@ -19,13 +21,30 @@ const userInitial = computed(() => {
   return email ? email[0].toUpperCase() : '?'
 })
 
+// 拉取自己的 profile（含 avatar_url）
+async function loadMyProfile() {
+  if (auth.isLoggedIn && auth.user) {
+    try {
+      const { profile } = await getUserProfile(auth.user.id)
+      myProfile.value = profile
+    } catch { myProfile.value = null }
+  } else {
+    myProfile.value = null
+  }
+}
+
 async function handleLogout() {
   await auth.signOut()
+  myProfile.value = null
   menuOpen.value = false
   router.push('/')
 }
 
+// 登录态变化时重新拉取
+watch(() => auth.isLoggedIn, loadMyProfile)
+
 onMounted(async () => {
+  await loadMyProfile()
   if (auth.isLoggedIn) {
     await ach.init()
     ach.checkAll()
@@ -51,10 +70,11 @@ onMounted(async () => {
           <template v-if="auth.isLoggedIn">
             <div class="relative ml-2">
               <button
-                class="w-8 h-8 rounded-full bg-brand-500 text-white text-sm font-medium flex items-center justify-center"
+                class="w-8 h-8 rounded-full bg-brand-500 text-white text-sm font-medium flex items-center justify-center overflow-hidden"
                 @click="menuOpen = !menuOpen"
               >
-                {{ userInitial }}
+                <img v-if="myProfile?.avatar_url" :src="myProfile.avatar_url" class="w-full h-full object-cover" alt="avatar" />
+                <span v-else>{{ userInitial }}</span>
               </button>
               <div
                 v-if="menuOpen"
