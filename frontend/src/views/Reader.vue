@@ -35,7 +35,6 @@ const pageInputRef = ref<HTMLInputElement | null>(null)
 const bookmarks = ref<Bookmark[]>([])
 const notes = ref<Note[]>([])
 const newNoteText = ref('')
-const pendingNote = ref<string>('')
 
 // TTS
 const ttsPlaying = ref(false)
@@ -255,6 +254,7 @@ function escapeHtml(s: string) {
 let epubBook: any = null
 let epubRendition: any = null
 let epubBlobUrl: string | null = null
+let epubKeyHandler: ((e: KeyboardEvent) => void) | null = null
 async function renderEpub() {
   // 动态导入 epubjs
   const ePub = (await import('epubjs')).default
@@ -310,11 +310,14 @@ async function renderEpub() {
   rendition.on?.('relocated', (loc: any) => console.log('[reader] relocated ->', loc?.start?.index, loc?.start?.href))
 
   // 翻页：键盘左右 / 触摸
-  window.addEventListener('keydown', (e) => {
+  // 先移除旧监听器（避免 renderEpub 被重复调用时泄漏）
+  if (epubKeyHandler) window.removeEventListener('keydown', epubKeyHandler)
+  epubKeyHandler = (e: KeyboardEvent) => {
     if (!epubRendition) return
     if (e.key === 'ArrowLeft' || e.key === 'PageUp')  epubRendition.prev()
     if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') epubRendition.next()
-  }, { passive: true })
+  }
+  window.addEventListener('keydown', epubKeyHandler, { passive: true })
 
   if (readerRef.value) {
     let touchStartX = 0
@@ -521,6 +524,7 @@ function scheduleSaveProgress(cfi?: string, page?: number) {
 
 onBeforeUnmount(() => {
   if (onResize) window.removeEventListener('resize', onResize)
+  if (epubKeyHandler) window.removeEventListener('keydown', epubKeyHandler)
   if (epubRendition) { try { epubRendition.destroy() } catch {} }
   if (epubBook) { try { epubBook.destroy() } catch {} }
   if (epubBlobUrl) { URL.revokeObjectURL(epubBlobUrl); epubBlobUrl = null }
