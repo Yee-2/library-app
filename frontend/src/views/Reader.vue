@@ -287,7 +287,6 @@ async function renderEpub() {
   //   flow: 'paginated'     —— 单页分页
   //   manager: 'continuous' —— 窄屏翻页更稳，next()/prev() 正常
   //   snap: true            —— 翻页对齐
-  //   allowScriptedContent  —— 允许 epub 内的脚本（MathJax 等）
   const rendition: any = book.renderTo(readerRef.value, {
     width: '100%',
     height: '100%',
@@ -295,15 +294,51 @@ async function renderEpub() {
     flow: 'paginated',
     manager: 'continuous',
     snap: true,
-    allowScriptedContent: true,
   })
   epubRendition = rendition
 
+  // 用 epubjs 原生 themes 注册自定义主题（替代手动注入 CSS，避免 rendered 循环）
+  rendition.themes.register('reader-light', {
+    body: {
+      'font-family': 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important',
+      'font-size': '18px !important',
+      'line-height': '1.8 !important',
+      'color': '#1f2937 !important',
+      'background': '#ffffff !important',
+    },
+    'a': { 'color': 'inherit !important' },
+  })
+  rendition.themes.register('reader-sepia', {
+    body: {
+      'font-family': 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important',
+      'background': '#f5e6c8 !important',
+      'color': '#3e2c1c !important',
+    },
+    'a': { 'color': 'inherit !important' },
+  })
+  rendition.themes.register('reader-dark', {
+    body: {
+      'font-family': 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important',
+      'background': '#1a1a1a !important',
+      'color': '#d4d4d4 !important',
+    },
+    'a': { 'color': 'inherit !important' },
+  })
+  rendition.themes.register('reader-green', {
+    body: {
+      'font-family': 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important',
+      'background': '#c8e6c9 !important',
+      'color': '#1b5e20 !important',
+    },
+    'a': { 'color': 'inherit !important' },
+  })
+  // 应用当前偏好主题
+  applyEpubTheme(rendition)
+  // 字号/行距/字体更新
+  applyEpubStyles(rendition)
+
   book.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
   book.on?.('closed', () => console.log('[reader] book closed'))
-  rendition.on?.('displayed', () => console.log('[reader] rendition displayed'))
-  rendition.on?.('rendered', (_section: any, view: any) => console.log('[reader] rendition rendered, view =', view?.nodeName))
-  rendition.on?.('layout', (_layout: any) => console.log('[reader] rendition layout'))
   rendition.on?.('relocated', (loc: any) => console.log('[reader] relocated ->', loc?.start?.index, loc?.start?.href))
 
   // 翻页：键盘左右 / 触摸
@@ -374,33 +409,6 @@ async function renderEpub() {
   try { rendition.resize() } catch {}
   setTimeout(() => { try { rendition.resize() } catch {} }, 200)
   setTimeout(() => { try { rendition.resize() } catch {} }, 800)
-  // 应用主题 CSS 到所有 iframe：
-  //   hooks.content 只在当前页触发，但预渲染页的 iframe 不触发。
-  //   'rendered' 事件对所有 iframe 都触发，我们在这里注入 CSS。
-  const readerCss = () => `
-    body {
-      font-family: ${reader.font().family} !important;
-      font-size: ${reader.fontSize}px !important;
-      line-height: ${reader.lineHeight} !important;
-      color: ${reader.theme().color} !important;
-      background: ${reader.theme().bg} !important;
-    }
-    a { color: inherit; }
-  `
-  rendition.on('rendered', (_section: any, view: any) => {
-    const d = (view as any)?.document
-    if (!d) return
-    try {
-      const head = d.querySelector('head') || d.createElement('head')
-      let styleEl = head.querySelector('#reader-injected-style')
-      if (!styleEl) {
-        styleEl = d.createElement('style')
-        styleEl.id = 'reader-injected-style'
-        head.appendChild(styleEl)
-      }
-      styleEl.textContent = readerCss()
-    } catch { /* cross-origin iframe */ }
-  })
 
   // 目录：从 epub 取 navigation.toc
   try {
@@ -432,6 +440,28 @@ async function renderEpub() {
       }).then((n) => notes.value.unshift(n))
     }
   })
+}
+
+// 应用 epub 主题（基于 reader.themeId）
+function applyEpubTheme(rendition: any) {
+  if (!rendition) return
+  const id = reader.themeId
+  const map: Record<string, string> = {
+    light: 'reader-light',
+    sepia: 'reader-sepia',
+    dark: 'reader-dark',
+    green: 'reader-green',
+  }
+  rendition.themes.select(map[id] || 'reader-light')
+}
+
+// 应用 epub 字号/行距/字体（基于 reader.fontSize/lineHeight/fontId）
+function applyEpubStyles(rendition: any) {
+  if (!rendition) return
+  const f = reader.font()
+  rendition.themes.fontSize(`${reader.fontSize}px`)
+  rendition.themes.override('line-height', String(reader.lineHeight), true)
+  rendition.themes.override('font-family', f.family, true)
 }
 
 async function renderPdf() {
@@ -548,11 +578,13 @@ onBeforeUnmount(() => {
 })
 
 // =============== 偏好应用 ===============
+// 修复：原来这里调用 renderEpub() 会导致死循环（rendition.on('rendered') 持续触发）
+// 改为只更新 epubjs 主题/样式，不重新渲染整个书
 watch([() => reader.fontId, () => reader.fontSize, () => reader.lineHeight, () => reader.themeId, () => reader.maxWidth], () => {
   if (readerRef.value) reader.applyTo(readerRef.value)
   if (epubRendition && book.value?.file_format === 'epub') {
-    // 重新应用 epub 样式
-    renderEpub()
+    applyEpubTheme(epubRendition)
+    applyEpubStyles(epubRendition)
   }
 })
 
