@@ -298,6 +298,7 @@ async function renderEpub() {
   epubRendition = rendition
 
   // 用 epubjs 原生 themes 注册自定义主题（替代手动注入 CSS，避免 rendered 循环）
+  // 主题 ID 与 types/index.ts 的 THEME_OPTIONS 一一对应
   rendition.themes.register('reader-light', {
     body: {
       'font-family': 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important',
@@ -308,11 +309,19 @@ async function renderEpub() {
     },
     'a': { 'color': 'inherit !important' },
   })
-  rendition.themes.register('reader-sepia', {
+  rendition.themes.register('reader-eye', {
     body: {
       'font-family': 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important',
-      'background': '#f5e6c8 !important',
-      'color': '#3e2c1c !important',
+      'background': '#c7e1c0 !important',
+      'color': '#1f2937 !important',
+    },
+    'a': { 'color': 'inherit !important' },
+  })
+  rendition.themes.register('reader-paper', {
+    body: {
+      'font-family': 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important',
+      'background': '#f5e9d0 !important',
+      'color': '#3b2f1e !important',
     },
     'a': { 'color': 'inherit !important' },
   })
@@ -321,14 +330,6 @@ async function renderEpub() {
       'font-family': 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important',
       'background': '#1a1a1a !important',
       'color': '#d4d4d4 !important',
-    },
-    'a': { 'color': 'inherit !important' },
-  })
-  rendition.themes.register('reader-green', {
-    body: {
-      'font-family': 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important',
-      'background': '#c8e6c9 !important',
-      'color': '#1b5e20 !important',
     },
     'a': { 'color': 'inherit !important' },
   })
@@ -448,9 +449,9 @@ function applyEpubTheme(rendition: any) {
   const id = reader.themeId
   const map: Record<string, string> = {
     light: 'reader-light',
-    sepia: 'reader-sepia',
+    eye: 'reader-eye',
+    paper: 'reader-paper',
     dark: 'reader-dark',
-    green: 'reader-green',
   }
   rendition.themes.select(map[id] || 'reader-light')
 }
