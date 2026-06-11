@@ -93,7 +93,7 @@ export async function listPublicBooks(opts: { q?: string; page?: number; pageSiz
   const pageSize = opts.pageSize ?? 20
   let query = supabase
     .from('books')
-    .select('*, profiles(username)')
+    .select('*, profiles!books_user_id_profiles_fkey(username)')
     .eq('is_public', true)
     .order('download_count', { ascending: false })
     .range(page * pageSize, page * pageSize + pageSize - 1)
@@ -108,7 +108,7 @@ export async function listPublicBooks(opts: { q?: string; page?: number; pageSiz
 export async function getBook(id: string) {
   const { data, error } = await supabase
     .from('books')
-    .select('*, profiles(username)')
+    .select('*, profiles!books_user_id_profiles_fkey(username)')
     .eq('id', id)
     .single()
   if (error) throw error
@@ -267,7 +267,7 @@ export async function listAllAchievements() {
 export async function listReviews(bookId: string) {
   const { data } = await supabase
     .from('reviews')
-    .select('*, profiles(username, avatar_url)')
+    .select('*, profiles!reviews_user_id_profiles_fkey(username, avatar_url)')
     .eq('book_id', bookId)
     .order('created_at', { ascending: false })
   return (data ?? []) as any[]
@@ -298,7 +298,7 @@ export async function toggleFavorite(bookId: string, isFavorite: boolean) {
 export async function listMyFavorites() {
   const { data } = await supabase
     .from('favorites')
-    .select('book_id, books(*, profiles(username))')
+    .select('book_id, books(*, profiles!books_user_id_profiles_fkey(username))')
     .order('created_at', { ascending: false })
   return (data ?? []) as any[]
 }
@@ -348,7 +348,7 @@ export async function listActivityFeed(limit = 50) {
   const { data: { user } } = await supabase.auth.getUser()
   let query = supabase
     .from('activity')
-    .select('*, profiles(username, avatar_url)')
+    .select('*, profiles!activity_user_id_profiles_fkey(username, avatar_url)')
     .order('created_at', { ascending: false })
     .limit(limit)
   if (user) {
@@ -387,7 +387,7 @@ export async function listUserPublicBooks(userId: string) {
 export async function searchPublicBooksFulltext(q: string, limit = 30) {
   const { data } = await supabase
     .from('books')
-    .select('*, profiles(username)')
+    .select('*, profiles!books_user_id_profiles_fkey(username)')
     .eq('is_public', true)
     .or(`title.ilike.%${q}%,author.ilike.%${q}%,description.ilike.%${q}%`)
     .order('download_count', { ascending: false })
