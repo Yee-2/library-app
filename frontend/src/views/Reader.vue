@@ -352,6 +352,23 @@ async function renderEpub() {
   // 字号/行距/字体更新
   applyEpubStyles(rendition)
 
+  // 调试：把 iframe 内容打出来
+  setTimeout(() => {
+    try {
+      const iframe = readerRef.value?.querySelector('iframe')
+      if (!iframe) {
+        console.warn('[reader-debug] no iframe found, readerRef children =', readerRef.value?.innerHTML?.slice(0, 200))
+        return
+      }
+      const doc = iframe.contentDocument || iframe.contentWindow?.document
+      console.log('[reader-debug] iframe body html =', doc?.body?.innerHTML?.slice(0, 500))
+      console.log('[reader-debug] iframe body text =', doc?.body?.textContent?.slice(0, 200))
+      console.log('[reader-debug] iframe size =', iframe.clientWidth, 'x', iframe.clientHeight)
+      const cs = doc?.body ? getComputedStyle(doc.body) : null
+      console.log('[reader-debug] body color =', cs?.color, 'background =', cs?.background, 'visibility =', cs?.visibility, 'opacity =', cs?.opacity)
+    } catch (e) { console.warn('[reader-debug] failed', e) }
+  }, 1500)
+
   book.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
   book.on?.('closed', () => console.log('[reader] book closed'))
   rendition.on?.('relocated', (loc: any) => console.log('[reader] relocated ->', loc?.start?.index, loc?.start?.href))
@@ -473,16 +490,17 @@ function applyEpubTheme(rendition: any) {
     paper: 'reader-paper',
     dark: 'reader-dark',
   }
-  rendition.themes.select(map[id] || 'reader-light')
+  const themeId = map[id] || 'reader-light'
+  // 改用 defaultRules 方式 —— themes.select 内部会触发 reflow
+  // 先用 override 改字号行距字号（不传 importance，避免 !important 冲突）
+  rendition.themes.fontSize(`${reader.fontSize}px`)
+  rendition.themes.select(themeId)
 }
 
 // 应用 epub 字号/行距/字体（基于 reader.fontSize/lineHeight/fontId）
 function applyEpubStyles(rendition: any) {
   if (!rendition) return
-  const f = reader.font()
   rendition.themes.fontSize(`${reader.fontSize}px`)
-  rendition.themes.override('line-height', String(reader.lineHeight), true)
-  rendition.themes.override('font-family', f.family, true)
 }
 
 async function renderPdf() {
