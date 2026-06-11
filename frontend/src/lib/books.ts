@@ -24,8 +24,12 @@ export async function uploadBook(file: File, meta: {
   const format = detectFormat(file.name)
   if (!format) throw new Error('不支持的文件格式（仅支持 epub/pdf/txt/mobi）')
 
-  const safeName = file.name.replace(/[^\w.一-龥-]/g, '_')
-  const filePath = `${user.id}/${Date.now()}-${safeName}`
+  // Storage object key 必须是纯 ASCII —— Supabase Storage 底层 S3 在 key 含
+  // 中文/非 ASCII 字符时签名校验会抛 InvalidKey。原始文件名存到 original_filename 字段。
+  const objectId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  const filePath = `${user.id}/${objectId}.${format}`
 
   const { error: upErr } = await supabase.storage
     .from('book-files')
@@ -34,7 +38,11 @@ export async function uploadBook(file: File, meta: {
 
   let coverUrl: string | null = null
   if (meta.coverFile) {
-    const coverPath = `${user.id}/${Date.now()}-cover-${meta.coverFile.name}`
+    const coverId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const coverExt = (meta.coverFile.name.split('.').pop() || 'jpg').toLowerCase()
+    const coverPath = `${user.id}/${coverId}.${coverExt}`
     const { error: coverErr } = await supabase.storage
       .from('book-covers')
       .upload(coverPath, meta.coverFile)
@@ -56,6 +64,7 @@ export async function uploadBook(file: File, meta: {
       file_format: format,
       file_size: file.size,
       is_public: !!meta.isPublic,
+      original_filename: file.name,
     })
     .select()
     .single()

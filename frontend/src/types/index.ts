@@ -15,6 +15,7 @@ export interface Book {
   language: string | null
   is_public: boolean
   download_count: number
+  original_filename: string | null
   created_at: string
   updated_at: string
 }
