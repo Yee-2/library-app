@@ -142,6 +142,7 @@ function escapeHtml(s: string) {
 
 let epubBook: any = null
 let epubRendition: any = null
+let epubBlobUrl: string | null = null
 async function renderEpub() {
   // 动态导入 epubjs
   const ePub = (await import('epubjs')).default
@@ -150,29 +151,62 @@ async function renderEpub() {
     epubRendition = null
     epubBook = null
   }
+  if (epubBlobUrl) { URL.revokeObjectURL(epubBlobUrl); epubBlobUrl = null }
   if (!readerRef.value) return
   readerRef.value.innerHTML = ''
 
+  // 先把文件下载到内存再喂给 epubjs —— 避开 signedUrl 跨域/重定向/Content-Type
+  // 不一致带来的 "不报错但渲染空白" 问题
+  let epubSrc: string
+  try {
+    const res = await fetch(fileUrl.value)
+    if (!res.ok) throw new Error('fetch epub failed: ' + res.status)
+    const blob = await res.blob()
+    const proper = blob.type && blob.type.includes('epub')
+      ? blob
+      : new Blob([blob], { type: 'application/epub+zip' })
+    epubBlobUrl = URL.createObjectURL(proper)
+    epubSrc = epubBlobUrl
+  } catch (e) {
+    console.error('[reader] epub download failed', e)
+    epubSrc = fileUrl.value
+  }
+
   // epubjs: ePub(url) 返回的是 Book，必须 .renderTo(el) 拿 Rendition 才会渲染
-  const book: any = ePub(fileUrl.value)
+  const book: any = ePub(epubSrc)
   epubBook = book
+
   const rendition: any = book.renderTo(readerRef.value, {
     width: '100%',
     height: '100%',
     spread: 'none',
     manager: 'default',
+    flow: 'paginated',
   })
   epubRendition = rendition
 
-  // 等 book ready 再 display —— 否则 saved.cfi 可能命中不到内容
-  await book.ready
-  const saved = await getProgress(bookId.value)
-  await rendition.display(saved?.cfi || undefined)
+  book.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
 
-  // 容器尺寸可能在 display 时尚未稳定，强制重排
+  try {
+    await Promise.race([
+      book.ready,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('book.ready timeout 15s')), 15000)),
+    ])
+  } catch (e) {
+    console.error('[reader]', e)
+  }
+  const saved = await getProgress(bookId.value)
+  try {
+    await rendition.display(saved?.cfi || undefined)
+  } catch (e) {
+    console.error('[reader] display error', e)
+  }
+
   await nextTick()
   try { rendition.resize() } catch {}
-  requestAnimationFrame(() => { try { rendition.resize() } catch {} })
+  setTimeout(() => { try { rendition.resize() } catch {} }, 200)
+  setTimeout(() => { try { rendition.resize() } catch {} }, 800)
+  console.debug('[reader] epub ready, container =', readerRef.value?.clientWidth, 'x', readerRef.value?.clientHeight)
   // 应用偏好样式
   rendition.hooks.content.register((contents: any) => {
     const css = `
@@ -287,6 +321,7 @@ onBeforeUnmount(() => {
   if (onResize) window.removeEventListener('resize', onResize)
   if (epubRendition) { try { epubRendition.destroy() } catch {} }
   if (epubBook) { try { epubBook.destroy() } catch {} }
+  if (epubBlobUrl) { URL.revokeObjectURL(epubBlobUrl); epubBlobUrl = null }
   stopTTS()
 })
 
