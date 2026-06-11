@@ -274,6 +274,21 @@ supabase functions deploy tts --no-verify-jwt
 **数据库变更**：
 在 Supabase SQL Editor 写新 SQL → 跑一遍。建议把变更 SQL 保存到 `supabase/migrations/00N_xxx.sql` 文件里，方便回溯。
 
+完整的迁移清单（截至 2026-06-11）：
+
+| 序号 | 文件 | 作用 |
+|------|------|------|
+| 001 | init.sql | 核心建表（books/profiles/progress/bookmarks/notes）+ RLS |
+| 002 | storage.sql | 存储桶（book-files/book-covers）+ 存储策略 |
+| 003 | increment_download.sql | 下载计数函数 |
+| 004 | books_profiles_fk.sql | books → profiles FK（幂等） |
+| 005 | phase2_3.sql | 阅读统计 / 关注 / 社区 / 成就 / 全文搜索 |
+| 006 | storage_key_ascii.sql | books.original_filename（中文 key 修复用） |
+| 007 | add_profiles_fk.sql | 所有 user_id 列 → profiles FK |
+| 008 | drop_duplicate_auth_fk.sql | 移除冗余的 auth.users FK（解决 PGRST201） |
+
+**迁移顺序**：按 001 → 008 依次跑一次即可；每个文件都是幂等的（drop if exists / on conflict do nothing）。
+
 ---
 
 ## 八、升级到生产级

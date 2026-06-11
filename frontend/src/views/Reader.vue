@@ -26,6 +26,11 @@ const showBookmarks = ref(false)
 const showNotes = ref(false)
 const showTTS = ref(false)
 
+// 快速跳转页码
+const pageInputVisible = ref(false)
+const pageInputValue = ref(1)
+const pageInputRef = ref<HTMLInputElement | null>(null)
+
 // 笔记 / 书签
 const bookmarks = ref<Bookmark[]>([])
 const notes = ref<Note[]>([])
@@ -196,7 +201,7 @@ function applyTxtPage() {
 }
 
 // 跳转到 txt 章节（按字符位置换算到对应 page）
-function jumpToChapter(index: number) {
+let jumpToChapter = (index: number) => {
   const ch = chapters.value.find(c => c.index === index)
   if (!ch) return
   txtPage.value = Math.max(0, Math.floor((ch.index ?? 0) / txtPageSize))
@@ -234,6 +239,13 @@ function nextPage() {
   if (book.value.file_format === 'epub') epubNext()
   else if (book.value.file_format === 'pdf') pdfNext()
   else txtNext()
+}
+
+function jumpToInputPage() {
+  const page = +(pageInputValue.value || 1)
+  txtPage.value = Math.max(0, Math.min(page - 1, txtTotalPages.value - 1))
+  applyTxtPage()
+  pageInputVisible.value = false
 }
 
 function escapeHtml(s: string) {
@@ -419,6 +431,32 @@ async function renderPdf() {
   const startPage = Math.max(1, prog?.page || 1)
   txtTotalPages.value = total
   txtPage.value = startPage - 1
+
+  // PDF 目录 = 页码 1..n（简单列表）
+  const pdfChapters: Array<{ id: string; label: string; index: number }> = []
+  for (let i = 1; i <= total; i++) {
+    pdfChapters.push({ id: `pdf-p-${i}`, label: `第 ${i} 页`, index: i - 1 })
+  }
+  chapters.value = pdfChapters
+
+  // 覆盖跳转函数：pdf 跳到具体页
+  const origJump = jumpToChapter
+  jumpToChapter = (index: number) => {
+    if (book.value?.file_format === 'pdf') {
+      const pdf = (readerRef.value as any)?.__pdf
+      if (!pdf) return
+      const page = index + 1
+      ;(readerRef.value as any).__currentPage = page
+      txtPage.value = page - 1
+      renderPdfPage(pdf, page)
+      progressPct.value = (page / pdf.numPages) * 100
+      scheduleSaveProgress(undefined, page)
+      showToc.value = false
+      return
+    }
+    origJump(index)
+  }
+
   await renderPdfPage(pdf, startPage)
   progressPct.value = (startPage / total) * 100
 
@@ -693,12 +731,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           class="btn-secondary"
         >上一页</button>
         <span class="text-slate-500">
-          <template v-if="book.file_format === 'epub'">
-            {{ Math.round(progressPct) }}%
-          </template>
-          <template v-else>
-            第 {{ txtPage + 1 }} / {{ txtTotalPages }} 页
-          </template>
+          <!-- 快速跳转页码 -->
+          <span class="cursor-pointer" @click="pageInputVisible = true" v-if="!pageInputVisible">
+            <template v-if="book.file_format === 'epub'">
+              {{ Math.round(progressPct) }}%
+            </template>
+            <template v-else>
+              第 {{ txtPage + 1 }} / {{ txtTotalPages }} 页
+            </template>
+          </span>
+          <form v-else @submit.prevent="jumpToInputPage" class="inline-flex items-center gap-1">
+            <input
+              ref="pageInputRef"
+              v-model="pageInputValue"
+              class="input w-20 text-center text-sm"
+              type="number"
+              min="1"
+              :max="txtTotalPages"
+              placeholder="页码"
+              @blur="pageInputVisible = false"
+            />
+            <button type="submit" class="btn-ghost text-xs px-1">跳转</button>
+          </form>
         </span>
         <button
           @click="epubNext()"
