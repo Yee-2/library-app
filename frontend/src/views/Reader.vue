@@ -46,7 +46,7 @@ let progressTimer: any
 let onResize: (() => void) | null = null
 
 onMounted(async () => {
-  console.debug('[reader] onMounted, bookId =', bookId.value)
+  console.log('[reader] onMounted, bookId =', bookId.value)
   try {
     onResize = () => { try { epubRendition?.resize() } catch {} }
     window.addEventListener('resize', onResize)
@@ -54,20 +54,20 @@ onMounted(async () => {
     ach.init().then(() => ach.checkAll())
     ach.lastHeartbeat = Date.now()
     const loaded = await getBook(bookId.value)
-    console.debug('[reader] loaded book, format =', loaded?.file_format, 'file_url =', loaded?.file_url)
+    console.log('[reader] loaded book, format =', loaded?.file_format, 'file_url =', loaded?.file_url)
     book.value = loaded
     const me = await currentUserId()
-    console.debug('[reader] currentUserId =', me, 'book.user_id =', loaded?.user_id, 'match =', loaded?.user_id === me)
+    console.log('[reader] currentUserId =', me, 'book.user_id =', loaded?.user_id, 'match =', loaded?.user_id === me)
     if (me && loaded.user_id !== me) {
       error.value = '无权访问此书（此书属于其他用户）'
       return
     }
-    console.debug('[reader] creating signed url...')
+    console.log('[reader] creating signed url...')
     fileUrl.value = await getMyBookFileUrl(loaded)
-    console.debug('[reader] signed url =', fileUrl.value.slice(0, 80) + '...')
+    console.log('[reader] signed url =', fileUrl.value.slice(0, 80) + '...')
     await loadSideData()
     await renderReader()
-    console.debug('[reader] renderReader finished')
+    console.log('[reader] renderReader finished')
   } catch (e: any) {
     console.error('[reader] onMounted caught:', e)
     error.value = e.message ?? String(e)
@@ -123,7 +123,7 @@ async function renderTxt() {
   }
   const buf = await res.arrayBuffer()
   const text = new TextDecoder('utf-8', { fatal: false }).decode(buf)
-  console.debug('[reader] txt decoded length =', text.length, 'bytes =', buf.byteLength)
+  console.log('[reader] txt decoded length =', text.length, 'bytes =', buf.byteLength)
   txtContent.value = text
   txtTotalPages.value = Math.max(1, Math.ceil(text.length / txtPageSize))
   const prog = await getProgress(bookId.value)
@@ -186,7 +186,7 @@ async function renderEpub() {
     epubSrc = fileUrl.value
   }
 
-  console.debug('[reader] book source =', epubSrc.startsWith('blob:') ? 'blob:...' + epubSrc.slice(-8) : epubSrc)
+  console.log('[reader] book source =', epubSrc.startsWith('blob:') ? 'blob:...' + epubSrc.slice(-8) : epubSrc)
   // epubjs: ePub(url) 返回的是 Book，必须 .renderTo(el) 拿 Rendition 才会渲染
   const book: any = ePub(epubSrc)
   epubBook = book
@@ -201,10 +201,10 @@ async function renderEpub() {
   epubRendition = rendition
 
   book.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
-  book.on?.('closed', () => console.debug('[reader] book closed'))
-  rendition.on?.('displayed', () => console.debug('[reader] rendition displayed'))
-  rendition.on?.('rendered', (_section: any, view: any) => console.debug('[reader] rendition rendered, view =', view?.nodeName))
-  rendition.on?.('layout', (_layout: any) => console.debug('[reader] rendition layout'))
+  book.on?.('closed', () => console.log('[reader] book closed'))
+  rendition.on?.('displayed', () => console.log('[reader] rendition displayed'))
+  rendition.on?.('rendered', (_section: any, view: any) => console.log('[reader] rendition rendered, view =', view?.nodeName))
+  rendition.on?.('layout', (_layout: any) => console.log('[reader] rendition layout'))
 
   try {
     await Promise.race([
@@ -225,9 +225,9 @@ async function renderEpub() {
   try { rendition.resize() } catch {}
   setTimeout(() => { try { rendition.resize() } catch {} }, 200)
   setTimeout(() => { try { rendition.resize() } catch {} }, 800)
-  console.debug('[reader] epub ready, container =', readerRef.value?.clientWidth, 'x', readerRef.value?.clientHeight)
-  console.debug('[reader] readerRef innerHTML length =', readerRef.value?.innerHTML.length)
-  console.debug('[reader] readerRef children =', readerRef.value?.children.length)
+  console.log('[reader] epub ready, container =', readerRef.value?.clientWidth, 'x', readerRef.value?.clientHeight)
+  console.log('[reader] readerRef innerHTML length =', readerRef.value?.innerHTML.length)
+  console.log('[reader] readerRef children =', readerRef.value?.children.length)
   // 应用偏好样式
   rendition.hooks.content.register((contents: any) => {
     const css = `
