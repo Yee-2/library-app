@@ -6,7 +6,8 @@
  * - 输入框可发表/回复
  */
 import { ref, computed, onMounted, watch } from 'vue'
-import { listComments, createComment, deleteComment, type Comment } from '@/lib/comments'
+import { listComments, createComment, deleteComment, countComments, type Comment } from '@/lib/comments'
+import { toast } from '@/lib/toast'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { Trash2, CornerDownRight, Send } from 'lucide-vue-next'
@@ -23,6 +24,7 @@ const router = useRouter()
 const open = ref(false)
 const loading = ref(false)
 const list = ref<Comment[]>([])
+const initialCount = ref<number | null>(null)  // 未展开时显示的评论数
 const draft = ref('')
 const submitting = ref(false)
 
@@ -40,6 +42,7 @@ async function load() {
   loading.value = true
   try {
     list.value = await listComments(props.postId)
+    initialCount.value = list.value.length
   } catch (e: any) {
     console.error('[comments]', e)
   } finally {
@@ -47,8 +50,15 @@ async function load() {
   }
 }
 
+async function loadCount() {
+  if (initialCount.value !== null) return
+  try {
+    initialCount.value = await countComments(props.postId)
+  } catch {}
+}
+
 watch(open, (v) => { if (v) load() })
-onMounted(() => { if (open.value) load() })
+onMounted(loadCount)
 
 function toggle() {
   if (!auth.isLoggedIn) { router.push('/login'); return }
@@ -64,7 +74,7 @@ async function submitRoot() {
     list.value = [...list.value, c]
     draft.value = ''
   } catch (e: any) {
-    alert('评论失败：' + e.message)
+    toast.error('评论失败：' + e.message)
   } finally {
     submitting.value = false
   }
@@ -81,7 +91,7 @@ async function submitReply() {
     replyDraft.value = ''
     replyTo.value = null
   } catch (e: any) {
-    alert('回复失败：' + e.message)
+    toast.error('回复失败：' + e.message)
   } finally {
     submitting.value = false
   }
@@ -93,7 +103,7 @@ async function removeComment(c: Comment) {
     await deleteComment(c.id)
     list.value = list.value.filter(x => x.id !== c.id && x.parent_id !== c.id)
   } catch (e: any) {
-    alert('删除失败：' + e.message)
+    toast.error('删除失败：' + e.message)
   }
 }
 
@@ -124,7 +134,7 @@ function openUser(id: string) { router.push(`/user/${id}`) }
       class="text-xs flex items-center gap-1 text-ink-300 hover:text-neon-purple transition group"
     >
       <CornerDownRight class="w-3.5 h-3.5 group-hover:rotate-[-30deg] transition" :stroke-width="1.75" />
-      <span>{{ open ? '收起' : '展开' }}评论 ({{ list.length || '·' }})</span>
+      <span>{{ open ? '收起' : '展开' }}评论 ({{ open ? list.length : (initialCount ?? '·') }})</span>
     </button>
 
     <Transition
