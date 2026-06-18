@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { getBook, getMyBookFileUrl, upsertProgress, getProgress, listBookmarks, addBookmark, deleteBookmark, listNotes, addNote, deleteNote, reportReadingHeartbeat } from '@/lib/books'
+import { toast } from '@/lib/toast'
 import { useReaderStore } from '@/stores/reader'
 import { ttsSynthesize, splitSentences, extractPdfText } from '@/lib/tts'
 import { useAchievementsStore } from '@/stores/achievements'
@@ -47,7 +48,36 @@ const ttsIndex = ref(0)
 
 // 阅读进度保存防抖
 let progressTimer: any
+let heartbeatTimer: any           // 独立心跳定时器（与翻页解耦）
 let onResize: (() => void) | null = null
+
+// 心跳：估算本次阅读时长（秒），并上报
+function reportHeartbeat() {
+  const now = Date.now()
+  const last = ach.lastHeartbeat || now
+  const seconds = Math.max(0, Math.min(600, Math.round((now - last) / 1000)))
+  if (seconds > 0) {
+    const wordsRead = Math.max(1, Math.round(progressPct.value * 5 / Math.max(1, seconds)))
+    ach.heartbeat(bookId.value, wordsRead).catch((e: any) => {
+      console.warn('[reader] heartbeat failed', e)
+    })
+  }
+  ach.lastHeartbeat = now
+}
+
+function startHeartbeatLoop() {
+  // 每 30 秒上报一次，不论用户是否翻页
+  heartbeatTimer = setInterval(reportHeartbeat, 30_000)
+}
+
+function stopHeartbeatLoop() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
+  // 退出时立即上报剩余时长
+  reportHeartbeat()
+}
 
 onMounted(async () => {
   console.log('[reader] onMounted, bookId =', bookId.value)
@@ -55,8 +85,12 @@ onMounted(async () => {
     onResize = () => { try { epubRendition?.resize() } catch {} }
     window.addEventListener('resize', onResize)
 
-    ach.init().then(() => ach.checkAll())
-    ach.lastHeartbeat = Date.now()
+    // 启动独立心跳（必须在加载书籍前启动，确保切书时也记录）
+    startHeartbeatLoop()
+
+    await ach.init()
+    ach.checkAll()
+    ach.lastHeartbeat = Date.now()  // init 完成后才设置基准时间，避免首次上报巨大数值
     const loaded = await getBook(bookId.value)
     console.log('[reader] loaded book, format =', loaded?.file_format, 'file_url =', loaded?.file_url)
     book.value = loaded
@@ -553,8 +587,7 @@ function scheduleSaveProgress(cfi?: string, page?: number) {
       page: page ?? (txtPage.value + 1),
       percentage: progressPct.value,
     }).catch(() => {})
-    // 心跳：每 30 秒上报一次阅读统计
-    ach.heartbeat(bookId.value, Math.round(progressPct.value * 5))
+    // 心跳改由独立定时器驱动（每 30s 一次），不再依赖翻页
   }, 1500)
 }
 
@@ -565,6 +598,8 @@ onBeforeUnmount(() => {
   if (epubRendition) { try { epubRendition.destroy() } catch {} }
   if (epubBook) { try { epubBook.destroy() } catch {} }
   if (epubBlobUrl) { URL.revokeObjectURL(epubBlobUrl); epubBlobUrl = null }
+  // 退出时立即上报剩余阅读时长（stopHeartbeatLoop 内部会调用 reportHeartbeat）
+  stopHeartbeatLoop()
   stopTTS()
 })
 
@@ -601,17 +636,17 @@ async function startTTS() {
   } else if (book.value?.file_format === 'pdf') {
     const pdf = (readerRef.value as any)?.__pdf
     const cur = (readerRef.value as any)?.__currentPage || 1
-    if (!pdf) { alert('PDF 未就绪'); return }
+    if (!pdf) { toast.error('PDF 未就绪'); return }
     showTTS.value = true
     try {
       text = await extractPdfText(fileUrl.value, cur, cur + 2)   // 读当前 + 后 2 页
     } catch (e: any) {
-      alert('PDF 文本提取失败：' + e.message)
+      toast.error('PDF 文本提取失败：' + e.message)
       return
     }
   }
   if (!text) {
-    alert('没有可朗读的文本')
+    toast.error('没有可朗读的文本')
     return
   }
   showTTS.value = true
@@ -645,7 +680,7 @@ async function playNextTTS() {
     audio.onerror = () => { ttsIndex.value++; playNextTTS() }
     await audio.play()
   } catch (e: any) {
-    alert('TTS 失败：' + e.message)
+    toast.error('TTS 失败：' + e.message)
     stopTTS()
   }
 }
