@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -8,6 +8,7 @@ import {
   uploadAvatar,
   type CommunityPost
 } from '@/lib/books'
+import { toast } from '@/lib/toast'
 import { debounce } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { splitContent } from '@/lib/parse'
@@ -138,7 +139,7 @@ async function downloadBook(b: any) {
     a.target = '_blank'
     a.click()
   } catch (e: any) {
-    alert('下载失败：' + e.message)
+    toast.error('下载失败：' + e.message)
   }
 }
 
@@ -181,7 +182,7 @@ function insertEmoji(emoji: string) {
 async function onPostImagePick(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
-  if (file.size > 5 * 1024 * 1024) { alert('图片不能超过 5MB'); return }
+  if (file.size > 5 * 1024 * 1024) { toast.error('图片不能超过 5MB'); return }
   postImageUploading.value = true
   try {
     // 上传到 avatars 桶（已公开，已有 RLS 策略）
@@ -197,7 +198,7 @@ async function onPostImagePick(e: Event) {
     const { data: pub } = supabase.storage.from('book-covers').getPublicUrl(path)
     postImageUrl.value = pub.publicUrl
   } catch (err: any) {
-    alert('图片上传失败：' + err.message)
+    toast.error('图片上传失败：' + err.message)
   } finally {
     postImageUploading.value = false
     ;(e.target as HTMLInputElement).value = ''
@@ -216,7 +217,7 @@ async function submitPost() {
     posts.value = [p, ...posts.value]
     closeComposer()
   } catch (e: any) {
-    alert('发布失败：' + e.message)
+    toast.error('发布失败：' + e.message)
   } finally {
     posting.value = false
   }
@@ -264,7 +265,7 @@ async function toggleLike(p: CommunityPost) {
   } catch (e: any) {
     p.liked_by_me = wasLiked
     p.like_count = (p.like_count ?? 0) + (p.liked_by_me ? 1 : -1)
-    alert(e.message)
+    toast.error(e.message)
   }
 }
 
@@ -274,7 +275,7 @@ async function deleteOwnPost(p: CommunityPost) {
     await deletePost(p.id)
     posts.value = posts.value.filter(x => x.id !== p.id)
   } catch (e: any) {
-    alert('删除失败：' + e.message)
+    toast.error('删除失败：' + e.message)
   }
 }
 </script>
