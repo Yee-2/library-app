@@ -5,6 +5,7 @@ import {
   listFollowers, listFollowing
 } from '@/lib/books'
 import { useAuthStore } from '@/stores/auth'
+import { maskUsername } from '@/lib/privacy'
 import { ArrowLeft, Users, UserPlus } from 'lucide-vue-next'
 import UserAvatar from '@/components/UserAvatar.vue'
 
@@ -18,7 +19,7 @@ const list = ref<any[]>([])
 const loading = ref(false)
 
 async function refresh() {
-  if (!userId.value) return
+  if (!userId.value || userId.value === 'undefined') return
   loading.value = true
   try {
     if (type.value === 'followers') {
@@ -56,7 +57,7 @@ function open(id: string) { router.push(`/user/${id}`) }
            @click="open(item.follower_id || item.followee_id)">
         <UserAvatar :user="item.profiles as any" size="md" />
         <div class="flex-1 min-w-0">
-          <div class="font-medium text-sm text-ink-50">{{ (item.profiles as any)?.username || '匿名' }}</div>
+          <div class="font-medium text-sm text-ink-50">{{ maskUsername((item.profiles as any)?.username) }}</div>
           <div class="text-xs text-ink-300">关注于 {{ new Date(item.created_at).toLocaleDateString('zh-CN') }}</div>
         </div>
         <span class="text-xs text-neon-purple">查看 ›</span>

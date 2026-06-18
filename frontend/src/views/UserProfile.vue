@@ -35,6 +35,10 @@ const savingBio = ref(false)
 const avatarFileInput = ref<HTMLInputElement | null>(null)
 
 async function refresh() {
+  if (!userId.value || userId.value === 'undefined') {
+    router.replace('/')
+    return
+  }
   loading.value = true
   try {
     const { profile: p, stats: s, achievements: a } = await getUserProfile(userId.value)

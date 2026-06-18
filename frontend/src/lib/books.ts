@@ -442,7 +442,7 @@ export async function isFollowing(userId: string) {
 export async function listFollowers(userId: string) {
   const { data } = await supabase
     .from('follows')
-    .select('follower_id, profiles!follows_follower_id_fkey(username, avatar_url)')
+    .select('follower_id, created_at, profiles!follows_follower_id_fkey(username, avatar_url)')
     .eq('followee_id', userId)
   return (data ?? []) as any[]
 }
@@ -450,7 +450,7 @@ export async function listFollowers(userId: string) {
 export async function listFollowing(userId: string) {
   const { data } = await supabase
     .from('follows')
-    .select('followee_id, profiles!follows_followee_id_fkey(username, avatar_url)')
+    .select('followee_id, created_at, profiles!follows_followee_id_fkey(username, avatar_url)')
     .eq('follower_id', userId)
   return (data ?? []) as any[]
 }

@@ -75,10 +75,13 @@ async function borrowToMyShelf(b: PubBook) {
     showLoginPrompt.value = true
     return
   }
+  if (downloading.value) return // 防止重复点击
+  downloading.value = b.id
   // 去重检查
   const existing = await findMyDuplicate(b.title)
   if (existing) {
     toast.info('这本书已经在你的书架中了')
+    downloading.value = null
     router.push('/library')
     return
   }

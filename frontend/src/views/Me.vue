@@ -109,6 +109,10 @@ async function handleLogout() {
 function openMyProfile() {
   if (auth.user) router.push(`/user/${auth.user.id}`)
 }
+
+function openMyFollowing() {
+  if (auth.user) router.push(`/follows/following/${auth.user.id}`)
+}
 </script>
 
 <template>
@@ -240,7 +244,7 @@ function openMyProfile() {
           <span class="text-xs text-ink-300">{{ achievements.length }}/{{ allAch.length }}</span>
           <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="router.push(`/follows/following/${auth.user?.id}`)" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-900 active:bg-ink-800/60 transition">
+        <button @click="openMyFollowing" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-900 active:bg-ink-800/60 transition">
           <span class="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-300 flex items-center justify-center flex-shrink-0">
             <UserRound class="w-5 h-5" :stroke-width="1.75" />
           </span>

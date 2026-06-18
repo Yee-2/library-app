@@ -28,6 +28,8 @@ const rRating = ref(5)
 const rContent = ref('')
 const actionLoading = ref(false)
 const showLoginPrompt = ref(false)
+const isBorrowed = ref(false)
+const borrowedBookId = ref<string | null>(null)
 
 async function refresh() {
   loading.value = true
@@ -38,6 +40,14 @@ async function refresh() {
     if (auth.isLoggedIn) {
       const { data } = await supabase.from('favorites').select('user_id').eq('user_id', auth.user!.id).eq('book_id', bookId.value).maybeSingle()
       isFav.value = !!data
+      // 检查是否已借阅过这本书
+      if (!isOwner.value && book.value) {
+        const dup = await findMyDuplicate(book.value.title)
+        if (dup) {
+          isBorrowed.value = true
+          borrowedBookId.value = dup.id
+        }
+      }
     }
   } catch (e: any) {
     console.error('[BookDetail] refresh error:', e)
@@ -51,14 +61,16 @@ onMounted(refresh)
 
 async function borrow() {
   if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
+  if (actionLoading.value) return // 防止重复点击
+  actionLoading.value = true
   // 去重检查
   const existing = await findMyDuplicate(book.value.title)
   if (existing) {
     toast.info('这本书已经在你的书架中了')
+    actionLoading.value = false
     router.push('/library')
     return
   }
-  actionLoading.value = true
   try {
     const url = await getPublicBookUrl(bookId.value)
     const res = await fetch(url)
@@ -92,7 +104,8 @@ async function download() {
 }
 
 async function readNow() {
-  router.push(`/read/${bookId.value}`)
+  const id = isBorrowed.value && borrowedBookId.value ? borrowedBookId.value : bookId.value
+  router.push(`/read/${id}`)
 }
 
 async function fav() {
@@ -168,14 +181,14 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
 
       <!-- 操作 -->
       <div class="grid grid-cols-4 gap-2 mb-4">
-        <button v-if="isOwner" @click="readNow" class="btn-primary col-span-2">
+        <button v-if="isOwner || isBorrowed" @click="readNow" class="btn-primary col-span-2">
           <BookOpen class="w-4 h-4" :stroke-width="1.75" />
           <span>阅读</span>
         </button>
         <button v-else @click="borrow" :disabled="actionLoading" class="btn-primary col-span-2">
           <span>{{ actionLoading ? '借阅中…' : '借阅到书架' }}</span>
         </button>
-        <button v-if="!isOwner" @click="download" class="btn-secondary">
+        <button v-if="!isOwner && !isBorrowed" @click="download" class="btn-secondary">
           <Download class="w-4 h-4" :stroke-width="1.75" />
           <span>下载</span>
         </button>
@@ -229,7 +242,7 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
           <div v-for="r in reviews" :key="r.id" class="border-b border-neon-purple/15 last:border-0 pb-3 last:pb-0">
             <div class="flex items-center gap-2">
               <UserAvatar :user="r.profiles" size="xs" />
-              <span class="text-sm font-medium">{{ r.profiles?.username || '匿名' }}</span>
+              <span class="text-sm font-medium">{{ r.user_id === auth.user?.id ? (r.profiles?.username || '匿名') : maskUsername(r.profiles?.username) }}</span>
               <div class="flex">
                 <Star v-for="n in 5" :key="n" class="w-3.5 h-3.5"
                       :fill="n <= r.rating ? 'currentColor' : 'none'"

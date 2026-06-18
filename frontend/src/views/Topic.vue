@@ -5,6 +5,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { listPostsByTag } from '@/lib/books'
+import { useAuthStore } from '@/stores/auth'
+import { maskUsername } from '@/lib/privacy'
 import { ArrowLeft, Hash, BookOpen, Heart, Image as ImageIcon } from 'lucide-vue-next'
 import { splitContent } from '@/lib/parse'
 import UserAvatar from '@/components/UserAvatar.vue'
@@ -13,6 +15,7 @@ import Skeleton from '@/components/Skeleton.vue'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const tag = computed(() => (route.params.tag as string) || '')
 const posts = ref<any[]>([])
 const loading = ref(false)
@@ -99,7 +102,7 @@ function handleClick(content: string, e: MouseEvent) {
         <div class="flex-1 min-w-0">
           <div class="text-sm flex items-center gap-2 flex-wrap">
             <span class="font-medium text-ink-50 cursor-pointer hover:underline" @click="openUser(p.user_id)">
-              {{ p.profiles?.username || '匿名' }}
+              {{ p.user_id === auth.user?.id ? (p.profiles?.username || '匿名') : maskUsername(p.profiles?.username) }}
             </span>
             <span class="text-xs text-ink-300">{{ timeAgo(p.created_at) }}</span>
           </div>
