@@ -3,8 +3,9 @@ import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { listMyAchievements, listAllAchievements, listMyFavorites, listMyBooks, getMyReadingSummary, getUserProfile, uploadAvatar } from '@/lib/books'
+import { getUnreadCount } from '@/lib/notifications'
 import { toast } from '@/lib/toast'
-import { BookOpen, Star, BarChart3, Trophy, UserRound, IdCard, Flame, LogOut, Upload, ChevronRight, Sparkles } from 'lucide-vue-next'
+import { BookOpen, Star, BarChart3, Trophy, UserRound, IdCard, Flame, LogOut, Upload, ChevronRight, Sparkles, Bell } from 'lucide-vue-next'
 import UserAvatar from '@/components/UserAvatar.vue'
 import NicknamePrompt from '@/components/NicknamePrompt.vue'
 import { isEmailLikeUsername, maskEmail } from '@/lib/privacy'
@@ -23,6 +24,7 @@ const myProfile = ref<any>(null)
 const uploadingAvatar = ref(false)
 const avatarInput = ref<HTMLInputElement | null>(null)
 const showNicknamePrompt = ref(false)
+const unreadCount = ref(0)
 
 const needsNickname = computed(() =>
   isEmailLikeUsername(myProfile.value?.username, auth.user?.email)
@@ -61,6 +63,9 @@ async function refresh() {
       else break
     }
     streak.value = s
+
+    // 通知未读数
+    unreadCount.value = await getUnreadCount()
   } catch (e: any) {
     console.error('[me]', e)
     loadError.value = e?.message ?? '加载失败，请检查网络后重试'
@@ -137,6 +142,13 @@ function openMyProfile() {
           </div>
           <div class="text-xs text-white/70 truncate">{{ maskEmail(auth.user?.email) }}</div>
         </div>
+        <button v-if="auth.isLoggedIn" @click="router.push('/notifications')" class="relative text-white/80 hover:text-white p-2 -m-2">
+          <Bell class="w-5 h-5" :stroke-width="1.75" />
+          <span
+            v-if="unreadCount > 0"
+            class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shadow-lg"
+          >{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+        </button>
         <button v-if="!auth.isLoggedIn" @click="router.push('/login')" class="bg-ink-50 text-neon-purple px-3 py-1.5 rounded-lg text-sm font-medium">
           登录
         </button>
@@ -188,6 +200,17 @@ function openMyProfile() {
     <div v-if="auth.isLoggedIn" class="space-y-2">
       <div v-if="loadError" class="card p-4 text-center text-rose-400 text-sm">{{ loadError }}</div>
       <div class="card divide-y divide-neon-purple/15">
+        <button @click="router.push('/notifications')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-900 active:bg-ink-800/60 transition">
+          <span class="relative w-9 h-9 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center flex-shrink-0">
+            <Bell class="w-5 h-5" :stroke-width="1.75" />
+            <span
+              v-if="unreadCount > 0"
+              class="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center px-1"
+            >{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+          </span>
+          <span class="flex-1 text-left">消息通知</span>
+          <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
+        </button>
         <button @click="router.push('/library')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-900 active:bg-ink-800/60 transition">
           <span class="w-9 h-9 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
             <BookOpen class="w-5 h-5" :stroke-width="1.75" />

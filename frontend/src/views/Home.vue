@@ -7,12 +7,14 @@ import { useAchievementsStore } from '@/stores/achievements'
 import { Search, BookOpen, Users, Trophy, BarChart3, Sparkles, Palette, Star } from 'lucide-vue-next'
 import BookCard from '@/components/BookCard.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
+import LoginPrompt from '@/components/LoginPrompt.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
 const ach = useAchievementsStore()
 const feed = ref<any[]>([])
 const hotBooks = ref<any[]>([])
+const showLoginPrompt = ref(false)
 
 async function refresh() {
   feed.value = (await listActivityFeed(10)).slice(0, 5)
@@ -33,6 +35,11 @@ function activityIcon(type: string) {
   if (type === 'review_added') return Star
   if (type === 'achievement') return Trophy
   return Sparkles
+}
+
+function onBookClick(id: string) {
+  if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
+  router.push(`/book/${id}`)
 }
 </script>
 
@@ -93,7 +100,7 @@ function activityIcon(type: string) {
       </div>
       <div class="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
         <div v-for="b in hotBooks" :key="b.id" class="w-24 flex-shrink-0 snap-start">
-          <BookCard :book="b" :show-format="false" :show-meta="false" @open="(id) => router.push(`/book/${id}`)" />
+          <BookCard :book="b" :show-format="false" :show-meta="false" @open="onBookClick" />
         </div>
       </div>
     </section>
@@ -159,5 +166,7 @@ function activityIcon(type: string) {
         </div>
       </div>
     </section>
+
+    <LoginPrompt :open="showLoginPrompt" @close="showLoginPrompt = false" />
   </div>
 </template>

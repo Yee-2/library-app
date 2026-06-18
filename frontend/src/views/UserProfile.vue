@@ -11,6 +11,7 @@ import { ArrowLeft, Upload, Trophy, BookOpen, Pencil } from 'lucide-vue-next'
 import BookCard from '@/components/BookCard.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import Skeleton from '@/components/Skeleton.vue'
+import LoginPrompt from '@/components/LoginPrompt.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,6 +24,7 @@ const achievements = ref<any[]>([])
 const books = ref<any[]>([])
 const following = ref(false)
 const loading = ref(false)
+const showLoginPrompt = ref(false)
 
 // 头像 / 签名编辑
 const uploadingAvatar = ref(false)
@@ -48,7 +50,7 @@ async function refresh() {
 onMounted(refresh)
 
 async function toggleFollow() {
-  if (!auth.isLoggedIn) { router.push('/login'); return }
+  if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
   try {
     if (following.value) {
       await unfollowUser(userId.value)
@@ -228,5 +230,7 @@ async function saveBio() {
         </div>
       </div>
     </div>
+
+    <LoginPrompt :open="showLoginPrompt" @close="showLoginPrompt = false" />
   </div>
 </template>

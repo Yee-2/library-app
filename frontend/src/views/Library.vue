@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { listMyBooks, uploadBook, deleteBook, togglePublic } from '@/lib/books'
 import { detectFormat } from '@/lib/books'
 import { toast } from '@/lib/toast'
@@ -8,14 +9,17 @@ import { formatBytes, formatDate } from '@/lib/utils'
 import type { Book } from '@/types'
 import { Upload, Search, Star, BarChart3, X, Globe, Lock, Trash2, BookOpen } from 'lucide-vue-next'
 import BookCard from '@/components/BookCard.vue'
+import LoginPrompt from '@/components/LoginPrompt.vue'
 
 const router = useRouter()
+const auth = useAuthStore()
 const books = ref<Book[]>([])
 const loading = ref(false)
 const showUpload = ref(false)
 const uploading = ref(false)
 const search = ref('')
 const filterFormat = ref<'all' | 'epub' | 'pdf' | 'txt' | 'mobi'>('all')
+const showLoginPrompt = ref(false)
 
 // 上传表单
 const file = ref<File | null>(null)
@@ -39,6 +43,7 @@ const filtered = computed(() => {
 })
 
 async function refresh() {
+  if (!auth.isLoggedIn) return
   loading.value = true
   try {
     books.value = await listMyBooks()
@@ -121,6 +126,19 @@ function readBook(b: Book | string) {
 
 <template>
   <div class="max-w-6xl mx-auto px-4 py-6">
+    <!-- 未登录状态 -->
+    <template v-if="!auth.isLoggedIn">
+      <div class="text-center py-16">
+        <BookOpen class="w-16 h-16 mx-auto text-ink-300 mb-3" :stroke-width="1.5" />
+        <p class="text-ink-300 mb-1">登录后管理你的书架</p>
+        <p class="text-xs text-ink-300/70 mb-4">导入、阅读、同步，一站式管理</p>
+        <button @click="showLoginPrompt = true" class="btn-primary">登录书架</button>
+      </div>
+      <LoginPrompt :open="showLoginPrompt" @close="showLoginPrompt = false" />
+    </template>
+
+    <!-- 已登录状态 -->
+    <template v-else>
     <div class="flex items-center justify-between mb-5">
       <h1 class="text-2xl font-bold tracking-tight">我的书架</h1>
       <div class="flex items-center gap-1">
@@ -254,5 +272,6 @@ function readBook(b: Book | string) {
         </div>
       </div>
     </Transition>
+    </template>
   </div>
 </template>

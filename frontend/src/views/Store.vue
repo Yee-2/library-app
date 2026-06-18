@@ -7,6 +7,7 @@ import { formatBytes, formatDate } from '@/lib/utils'
 import { useRouter } from 'vue-router'
 import { Search, Download, BookOpen } from 'lucide-vue-next'
 import BookCard from '@/components/BookCard.vue'
+import LoginPrompt from '@/components/LoginPrompt.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -28,6 +29,7 @@ const books = ref<PubBook[]>([])
 const q = ref('')
 const loading = ref(false)
 const downloading = ref<string | null>(null)
+const showLoginPrompt = ref(false)
 
 async function refresh() {
   loading.value = true
@@ -49,7 +51,7 @@ onMounted(refresh)
 
 async function download(b: PubBook) {
   if (!auth.isLoggedIn) {
-    router.push('/login')
+    showLoginPrompt.value = true
     return
   }
   downloading.value = b.id
@@ -70,7 +72,7 @@ async function download(b: PubBook) {
 
 async function borrowToMyShelf(b: PubBook) {
   if (!auth.isLoggedIn) {
-    router.push('/login')
+    showLoginPrompt.value = true
     return
   }
   if (!confirm(`将《${b.title}》加入我的书架？`)) return
@@ -127,5 +129,7 @@ function openBook(id: string) {
         </template>
       </BookCard>
     </div>
+
+    <LoginPrompt :open="showLoginPrompt" @close="showLoginPrompt = false" />
   </div>
 </template>

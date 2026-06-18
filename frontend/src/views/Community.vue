@@ -22,12 +22,15 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import CommentList from '@/components/CommentList.vue'
 import MentionPicker from '@/components/MentionPicker.vue'
 import Skeleton from '@/components/Skeleton.vue'
+import LoginPrompt from '@/components/LoginPrompt.vue'
+import { maskEmail } from '@/lib/privacy'
 
 const router = useRouter()
 const auth = useAuthStore()
 const tab = ref<'feed' | 'books' | 'people'>('feed')
 const q = ref('')
 const loading = ref(false)
+const showLoginPrompt = ref(false)
 
 const feed = ref<any[]>([])
 const books = ref<any[]>([])
@@ -70,6 +73,13 @@ async function refresh() {
   loading.value = true
   try {
     if (tab.value === 'feed') {
+      if (!auth.isLoggedIn) {
+        // 未登录不加载动态数据
+        feed.value = []
+        posts.value = []
+        people.value = []
+        return
+      }
       const [activity, postList] = await Promise.all([
         listActivityFeed(50),
         listCommunityPosts({ limit: 30 }),
@@ -98,25 +108,24 @@ function onSearch() { refreshDebounced() }
 
 onMounted(() => {
   refresh()
-  // 实时订阅：新帖 / 点赞 / 评论
-  unsubRealtime = subscribeCommunityFeed({
-    onNewPost: (p) => {
-      // 避免重复：当前用户自己发的已经由 submitPost 插入
-      if (p.user_id === auth.user?.id) return
-      const exists = posts.value.find(x => x.id === p.id)
-      if (exists) return
-      posts.value = [p, ...posts.value]
-      flashPostId.value = p.id
-      setTimeout(() => { flashPostId.value = null }, 2400)
-    },
-    onLikeChange: (postId, delta) => {
-      const p = posts.value.find(x => x.id === postId)
-      if (p) p.like_count = Math.max(0, (p.like_count ?? 0) + delta)
-    },
-    onNewComment: (_postId) => {
-      // 评论数变化 - 此处只闪一下，真实列表在 CommentList 内加载
-    }
-  })
+  // 实时订阅仅在登录后启用
+  if (auth.isLoggedIn) {
+    unsubRealtime = subscribeCommunityFeed({
+      onNewPost: (p) => {
+        if (p.user_id === auth.user?.id) return
+        const exists = posts.value.find(x => x.id === p.id)
+        if (exists) return
+        posts.value = [p, ...posts.value]
+        flashPostId.value = p.id
+        setTimeout(() => { flashPostId.value = null }, 2400)
+      },
+      onLikeChange: (postId, delta) => {
+        const p = posts.value.find(x => x.id === postId)
+        if (p) p.like_count = Math.max(0, (p.like_count ?? 0) + delta)
+      },
+      onNewComment: (_postId) => {}
+    })
+  }
 })
 onActivated(refresh)
 onBeforeUnmount(() => { unsubRealtime?.() })
@@ -130,7 +139,7 @@ function openUser(id: string) {
 }
 
 async function downloadBook(b: any) {
-  if (!auth.isLoggedIn) { router.push('/login'); return }
+  if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
   try {
     const url = await getPublicBookUrl(b.id)
     const a = document.createElement('a')
@@ -160,7 +169,7 @@ function activityText(a: any) {
 
 // ---- 发帖逻辑 ----
 function openComposer() {
-  if (!auth.isLoggedIn) { router.push('/login'); return }
+  if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
   postDraft.value = ''
   postImageUrl.value = null
   showEmojiPicker.value = false
@@ -255,7 +264,7 @@ function openTag(tag: string) {
 }
 
 async function toggleLike(p: CommunityPost) {
-  if (!auth.isLoggedIn) { router.push('/login'); return }
+  if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
   const wasLiked = !!p.liked_by_me
   p.liked_by_me = !wasLiked
   p.like_count = (p.like_count ?? 0) + (p.liked_by_me ? 1 : -1)
@@ -339,6 +348,14 @@ async function deleteOwnPost(p: CommunityPost) {
 
     <!-- 动态流 -->
     <div v-else-if="tab === 'feed'" class="space-y-3">
+      <!-- 未登录提示 -->
+      <div v-if="!auth.isLoggedIn" class="text-center py-12">
+        <Users class="w-14 h-14 mx-auto text-ink-300 mb-3" :stroke-width="1.5" />
+        <p class="text-ink-300 mb-1">登录后查看社区动态</p>
+        <p class="text-xs text-ink-300/70 mb-4">浏览帖子、互动交流、发现好书</p>
+        <button @click="showLoginPrompt = true" class="btn-primary">登录社区</button>
+      </div>
+      <template v-else>
       <!-- 用户帖子 -->
       <TransitionGroup name="stagger" tag="div" class="space-y-3">
       <div v-for="p in posts" :key="p.id"
@@ -418,6 +435,7 @@ async function deleteOwnPost(p: CommunityPost) {
           class="text-xs text-neon-purple hover:underline"
         >查看</button>
       </div>
+      </template>
     </div>
 
     <!-- 公开书 -->
@@ -573,5 +591,7 @@ async function deleteOwnPost(p: CommunityPost) {
       @pick="onMentionPick"
       @close="mentionOpen = false"
     />
+
+    <LoginPrompt :open="showLoginPrompt" @close="showLoginPrompt = false" />
   </div>
 </template>

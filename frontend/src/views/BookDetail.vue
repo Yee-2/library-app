@@ -10,6 +10,7 @@ import { toast } from '@/lib/toast'
 import { formatDate } from '@/lib/utils'
 import { ArrowLeft, BookOpen, Download, Star, User, Hash, Type, FileText } from 'lucide-vue-next'
 import UserAvatar from '@/components/UserAvatar.vue'
+import LoginPrompt from '@/components/LoginPrompt.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,6 +25,7 @@ const showReview = ref(false)
 const rRating = ref(5)
 const rContent = ref('')
 const actionLoading = ref(false)
+const showLoginPrompt = ref(false)
 
 async function refresh() {
   loading.value = true
@@ -42,7 +44,7 @@ async function refresh() {
 onMounted(refresh)
 
 async function borrow() {
-  if (!auth.isLoggedIn) { router.push('/login'); return }
+  if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
   actionLoading.value = true
   try {
     const url = await getPublicBookUrl(bookId.value)
@@ -60,7 +62,7 @@ async function borrow() {
 }
 
 async function download() {
-  if (!auth.isLoggedIn) { router.push('/login'); return }
+  if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
   try {
     const url = await getPublicBookUrl(bookId.value)
     const a = document.createElement('a')
@@ -78,7 +80,7 @@ async function readNow() {
 }
 
 async function fav() {
-  if (!auth.isLoggedIn) { router.push('/login'); return }
+  if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
   try {
     await toggleFavorite(bookId.value, isFav.value)
     isFav.value = !isFav.value
@@ -219,5 +221,7 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
         </div>
       </div>
     </div>
+
+    <LoginPrompt :open="showLoginPrompt" @close="showLoginPrompt = false" />
   </div>
 </template>

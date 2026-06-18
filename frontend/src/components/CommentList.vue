@@ -13,6 +13,7 @@ import { useRouter } from 'vue-router'
 import { Trash2, CornerDownRight, Send } from 'lucide-vue-next'
 import UserAvatar from '@/components/UserAvatar.vue'
 import Skeleton from '@/components/Skeleton.vue'
+import LoginPrompt from '@/components/LoginPrompt.vue'
 
 const props = defineProps<{
   postId: string
@@ -27,6 +28,7 @@ const list = ref<Comment[]>([])
 const initialCount = ref<number | null>(null)  // 未展开时显示的评论数
 const draft = ref('')
 const submitting = ref(false)
+const showLoginPrompt = ref(false)
 
 // 一级 + 二级分类
 const rootComments = computed(() => list.value.filter(c => !c.parent_id))
@@ -61,7 +63,7 @@ watch(open, (v) => { if (v) load() })
 onMounted(loadCount)
 
 function toggle() {
-  if (!auth.isLoggedIn) { router.push('/login'); return }
+  if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
   open.value = !open.value
 }
 
@@ -254,5 +256,7 @@ function openUser(id: string) { router.push(`/user/${id}`) }
         </div>
       </div>
     </Transition>
+
+    <LoginPrompt :open="showLoginPrompt" @close="showLoginPrompt = false" />
   </div>
 </template>
