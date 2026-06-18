@@ -6,6 +6,16 @@ import { router } from './router'
 import './style.css'
 import { useAuthStore } from './stores/auth'
 
+// 提前同步主题到 <html>，避免首屏闪烁
+;(function applyThemeEarly() {
+  try {
+    const saved = localStorage.getItem('app:theme') as 'light' | 'dark' | null
+    const t: 'light' | 'dark' = saved === 'light' ? 'light' : 'dark'
+    if (t === 'dark') document.documentElement.classList.add('dark')
+    document.documentElement.setAttribute('data-theme', t)
+  } catch {}
+})()
+
 async function bootstrap() {
   const app = createApp(App)
   const pinia = createPinia()

@@ -4,16 +4,19 @@ import { useAuthStore } from '@/stores/auth'
 import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useAchievementsStore } from '@/stores/achievements'
 import { getUserProfile } from '@/lib/books'
-import { BookOpen, BarChart3, Trophy, LogOut, Search, Home, Users, Sparkles } from 'lucide-vue-next'
+import { BookOpen, BarChart3, Trophy, LogOut, Search, Home, Users, Sparkles, Sun, Moon } from 'lucide-vue-next'
 import TabBar from '@/components/TabBar.vue'
 import AchievementToast from '@/components/AchievementToast.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
+import ToastHost from '@/components/ToastHost.vue'
 import { maskEmail } from '@/lib/privacy'
+import { useTheme } from '@/composables/useTheme'
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 const ach = useAchievementsStore()
+const { theme, toggle: toggleTheme } = useTheme()
 
 const menuOpen = ref(false)
 const myProfile = ref<any>(null)
@@ -93,6 +96,24 @@ onBeforeUnmount(() => {
             <span class="ml-1">社区</span>
           </RouterLink>
 
+          <!-- 主题切换 -->
+          <button
+            class="btn-icon btn-ghost ml-1"
+            :title="theme === 'dark' ? '切换到白天' : '切换到暗黑'"
+            @click="toggleTheme"
+          >
+            <Transition
+              enter-active-class="transition duration-200"
+              leave-active-class="transition duration-150"
+              enter-from-class="opacity-0 rotate-90"
+              leave-to-class="opacity-0 -rotate-90"
+              mode="out-in"
+            >
+              <Sun v-if="theme === 'dark'" key="sun" class="w-4 h-4" :stroke-width="1.75" />
+              <Moon v-else key="moon" class="w-4 h-4" :stroke-width="1.75" />
+            </Transition>
+          </button>
+
           <template v-if="auth.isLoggedIn">
             <div class="relative ml-2">
               <button
@@ -158,7 +179,8 @@ onBeforeUnmount(() => {
       <RouterView v-slot="{ Component, route: r }">
         <transition name="fade-slide" mode="out-in">
           <keep-alive :include="['home','library','community','me']">
-            <component :is="Component" :key="r.fullPath" />
+            <!-- 用 route.name 做 key，避免 query 变化时重建组件破坏 keep-alive -->
+            <component :is="Component" :key="(r.name as string) || r.path" />
           </keep-alive>
         </transition>
       </RouterView>
@@ -167,6 +189,7 @@ onBeforeUnmount(() => {
     <TabBar v-if="showTabBar" />
 
     <AchievementToast />
+    <ToastHost />
 
     <footer v-if="!showTabBar" class="border-t border-neon-purple/15 py-5 text-center text-xs text-ink-300">
       © {{ new Date().getFullYear() }} 云端图书馆 · Powered by Supabase + Vercel

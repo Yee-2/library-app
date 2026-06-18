@@ -3,6 +3,128 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ========================================================================
+   主题系统 - 通过 CSS 变量在 :root (light) / :root.dark (默认) 之间切换
+   ======================================================================== */
+:root {
+  /* 背景 */
+  --bg-body-from: #f5f3ff;
+  --bg-body-mid:  #ede9fe;
+  --bg-body-to:   #e0e7ff;
+  --bg-text:      #1f2937;
+
+  /* 玻璃面板 (light) */
+  --glass-bg:    rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(168, 85, 247, 0.25);
+
+  /* 卡片 (light) */
+  --card-bg:     rgba(255, 255, 255, 0.85);
+  --card-border: rgba(168, 85, 247, 0.15);
+
+  /* 输入框 (light) */
+  --input-bg:     #ffffff;
+  --input-border: #e9d5ff;
+  --input-text:   #1f2937;
+
+  /* 滚动条 (light) */
+  --scrollbar-thumb: rgba(168, 85, 247, 0.3);
+  --scrollbar-thumb-hover: rgba(168, 85, 247, 0.6);
+
+  /* 骨架屏 (light) */
+  --skeleton-from: rgba(168, 85, 247, 0.06);
+  --skeleton-mid:  rgba(168, 85, 247, 0.18);
+  --skeleton-to:   rgba(168, 85, 247, 0.06);
+
+  /* 文字 ink-* 调色板（亮色模式下用深色）*/
+  --ink-50:  #f5f3ff;
+  --ink-100: #ede9fe;
+  --ink-200: #c4b5fd;
+  --ink-300: #6b21a8;
+  --ink-400: #581c87;
+  --ink-500: #4c1d95;
+  --ink-600: #3b1d6e;
+  --ink-700: #2e1065;
+  --ink-800: #1a0f33;
+  --ink-850: #27164a;
+  --ink-900: #ffffff;
+  --ink-950: #f5f3ff;
+}
+
+:root.dark {
+  /* 背景 (深色) */
+  --bg-body-from: #0f0820;
+  --bg-body-mid:  #1a0f33;
+  --bg-body-to:   #27164a;
+  --bg-text:      #f5f3ff;
+
+  /* 玻璃面板 (深色) */
+  --glass-bg:    rgba(39, 22, 74, 0.55);
+  --glass-border: rgba(168, 85, 247, 0.18);
+
+  /* 卡片 (深色) */
+  --card-bg:     rgba(39, 22, 74, 0.55);
+  --card-border: rgba(168, 85, 247, 0.15);
+
+  /* 输入框 (深色) */
+  --input-bg:     rgba(39, 22, 74, 0.6);
+  --input-border: rgba(168, 85, 247, 0.2);
+  --input-text:   #f5f3ff;
+
+  /* 滚动条 (深色) */
+  --scrollbar-thumb: rgba(168, 85, 247, 0.3);
+  --scrollbar-thumb-hover: rgba(168, 85, 247, 0.6);
+
+  /* 骨架屏 (深色) */
+  --skeleton-from: rgba(139, 92, 246, 0.08);
+  --skeleton-mid:  rgba(168, 85, 247, 0.2);
+  --skeleton-to:   rgba(139, 92, 246, 0.08);
+
+  /* 文字 ink-* 调色板（深色模式下用浅色） */
+  --ink-50:  #f5f3ff;
+  --ink-100: #e9e5ff;
+  --ink-200: #c4b5fd;
+  --ink-300: #a78bfa;
+  --ink-400: #8b5cf6;
+  --ink-500: #7c3aed;
+  --ink-600: #6d28d9;
+  --ink-700: #5b21b6;
+  --ink-800: #3b1d6e;
+  --ink-850: #27164a;
+  --ink-900: #1a0f33;
+  --ink-950: #0f0820;
+}
+
+/* 把 Tailwind 的 ink 色映射到 CSS 变量（这样业务代码用 bg-ink-900 等自动跟随主题） */
+@layer utilities {
+  .bg-ink-50  { background-color: var(--ink-50); }
+  .bg-ink-100 { background-color: var(--ink-100); }
+  .bg-ink-200 { background-color: var(--ink-200); }
+  .bg-ink-300 { background-color: var(--ink-300); }
+  .bg-ink-700 { background-color: var(--ink-700); }
+  .bg-ink-800 { background-color: var(--ink-800); }
+  .bg-ink-850 { background-color: var(--ink-850); }
+  .bg-ink-900 { background-color: var(--ink-900); }
+  .bg-ink-950 { background-color: var(--ink-950); }
+
+  .text-ink-50  { color: var(--ink-50); }
+  .text-ink-100 { color: var(--ink-100); }
+  .text-ink-200 { color: var(--ink-200); }
+  .text-ink-300 { color: var(--ink-300); }
+  .text-ink-400 { color: var(--ink-400); }
+  .text-ink-500 { color: var(--ink-500); }
+
+  .border-ink-300 { border-color: var(--ink-300); }
+  .border-ink-700 { border-color: var(--ink-700); }
+  .border-ink-800 { border-color: var(--ink-800); }
+  .border-ink-900 { border-color: var(--ink-900); }
+
+  /* 主题感知渐变 */
+  .from-ink-800 { --tw-gradient-from: var(--ink-800); }
+  .to-ink-850   { --tw-gradient-to: var(--ink-850); }
+  .from-ink-900 { --tw-gradient-from: var(--ink-900); }
+  .to-ink-950   { --tw-gradient-to: var(--ink-950); }
+}
+
 html, body, #app {
   height: 100%;
   margin: 0;
@@ -11,19 +133,20 @@ html, body, #app {
 
 body {
   font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: linear-gradient(135deg, #0f0820 0%, #1a0f33 50%, #27164a 100%);
+  background: linear-gradient(135deg, var(--bg-body-from) 0%, var(--bg-body-mid) 50%, var(--bg-body-to) 100%);
   background-attachment: fixed;
-  color: #f5f3ff;
+  color: var(--bg-text);
   min-height: 100vh;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* 滚动条（暗色） */
+/* 滚动条 */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(168,85,247,0.6); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* 阅读器样式变量（由 JS 动态注入） */
+/* 阅读器样式变量（由 JS 动态注入，不受主题切换影响） */
 .reader-area {
   font-size: var(--reader-font-size, 18px);
   line-height: var(--reader-line-height, 1.8);
@@ -56,7 +179,7 @@ body {
   min-height: 100%;
 }
 
-/* 翻页式阅读器（txt/pdf）—— 禁止滚动，背景铺满 */
+/* 翻页式阅读器 */
 .reader-scroller-paged {
   overflow: hidden !important;
   background: var(--reader-bg, #ffffff);
@@ -67,7 +190,7 @@ body {
   overflow: hidden;
 }
 
-/* 翻页动画（txt/pdf 左右滑动） */
+/* 翻页动画 */
 .page-turn {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
@@ -94,10 +217,8 @@ body {
   padding: 0 2px;
 }
 
-/* 路由过渡 - fade-slide */
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.2s;
-}
+/* 路由过渡 */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
 .fade-slide-enter-active, .fade-slide-leave-active {
@@ -123,34 +244,39 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* 按钮 / 输入 / 卡片 - 暗色霓虹基类 */
+/* 按钮 / 输入 / 卡片 */
 @layer components {
   .btn { @apply inline-flex items-center justify-center gap-1.5 px-4 h-10 rounded-xl text-sm font-medium
          transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
          select-none whitespace-nowrap; }
   .btn-primary   { @apply btn bg-gradient-to-r from-neon-purple to-neon-pink text-white shadow-lg
                    hover:shadow-[0_0_24px_rgba(168,85,247,0.55)]; }
-  .btn-secondary { @apply btn bg-ink-800/60 text-ink-100 border border-neon-purple/20
-                   hover:bg-ink-800 hover:border-neon-purple/40; }
-  .btn-ghost     { @apply btn text-ink-200 hover:bg-neon-purple/10 hover:text-ink-50; }
+  .btn-secondary { @apply btn border text-ink-700 dark:text-ink-100 border-neon-purple/20
+                   bg-white/60 dark:bg-ink-800/60
+                   hover:border-neon-purple/40 hover:bg-neon-purple/10; }
+  .btn-ghost     { @apply btn text-ink-700 dark:text-ink-200 hover:bg-neon-purple/10 hover:text-neon-purple; }
   .btn-danger    { @apply btn bg-rose-500 text-white shadow-sm hover:bg-rose-400; }
   .btn-icon      { @apply btn p-0 w-10 h-10 rounded-xl; }
 
-  .input { @apply w-full px-3.5 h-10 rounded-xl bg-ink-800/60 border border-neon-purple/20
-          text-ink-50 placeholder:text-ink-300 focus:outline-none focus:ring-2
-          focus:ring-neon-purple/40 focus:border-neon-purple/60 transition; }
+  .input { @apply w-full px-3.5 h-10 rounded-xl border
+          text-ink-900 dark:text-ink-50 placeholder:text-ink-300 dark:placeholder:text-ink-300
+          focus:outline-none focus:ring-2 focus:ring-neon-purple/40 focus:border-neon-purple/60 transition;
+          background: var(--input-bg);
+          border-color: var(--input-border); }
 
-  .card { @apply rounded-2xl transition; background: rgba(39,22,74,0.55); backdrop-filter: blur(12px);
-          border: 1px solid rgba(168,85,247,0.15); }
+  .card { @apply rounded-2xl transition;
+          background: var(--card-bg);
+          border: 1px solid var(--card-border);
+          backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
   .card-hover { @apply card hover:shadow-[0_0_28px_rgba(168,85,247,0.35)]
                 hover:border-neon-purple/40 hover:-translate-y-0.5 transition-all duration-200; }
 
   /* 玻璃面板 */
   .glass-panel {
-    background: rgba(39, 22, 74, 0.55);
+    background: var(--glass-bg);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(168, 85, 247, 0.18);
+    border: 1px solid var(--glass-border);
   }
 
   /* 霓虹辉光 */
@@ -163,7 +289,7 @@ body {
 
 /* 加载骨架屏 */
 .skeleton {
-  background: linear-gradient(90deg, rgba(139,92,246,0.08) 0%, rgba(168,85,247,0.2) 50%, rgba(139,92,246,0.08) 100%);
+  background: linear-gradient(90deg, var(--skeleton-from) 0%, var(--skeleton-mid) 50%, var(--skeleton-from) 100%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
   border-radius: 0.75rem;
@@ -173,14 +299,14 @@ body {
   100% { background-position: -200% 0; }
 }
 
-/* 标签徽章（暗色） */
+/* 标签徽章 */
 .badge {
   @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
 }
 .badge-brand  { @apply badge bg-neon-purple/15 text-neon-purple border border-neon-purple/25; }
-.badge-gray   { @apply badge bg-ink-800/60 text-ink-200; }
-.badge-green  { @apply badge bg-emerald-500/15 text-emerald-300 border border-emerald-400/20; }
-.badge-amber  { @apply badge bg-amber-500/15 text-amber-300 border border-amber-400/20; }
+.badge-gray   { @apply badge bg-ink-200/30 dark:bg-ink-800/60 text-ink-700 dark:text-ink-200; }
+.badge-green  { @apply badge bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-400/20; }
+.badge-amber  { @apply badge bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-400/20; }
 .badge-pink   { @apply badge bg-neon-pink/15 text-neon-pink border border-neon-pink/25; }
 
 /* 文字截断 */
