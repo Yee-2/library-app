@@ -23,6 +23,7 @@ export const router = createRouter({
     { path: '/achievements', name: 'achievements', component: () => import('./views/Achievements.vue'), meta: { auth: true, hideTab: true } },
     { path: '/favorites',name: 'favorites', component: () => import('./views/Favorites.vue'), meta: { auth: true, hideTab: true } },
     { path: '/follows/:type/:id?', name: 'follows', component: () => import('./views/Follows.vue'), meta: { hideTab: true } },
+    { path: '/topic/:tag', name: 'topic', component: () => import('./views/Topic.vue'), meta: { hideTab: true } },
 
     // ============ 404 ============
     { path: '/:pathMatch(.*)*', name: 'notfound', component: () => import('./views/NotFound.vue') },

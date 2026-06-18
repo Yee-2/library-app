@@ -471,7 +471,7 @@ export interface CommunityPost {
 }
 
 /** 发布社区帖子 */
-export async function createPost(content: string, bookId?: string | null, imageUrl?: string | null): Promise<CommunityPost> {
+export async function createPost(content: string, bookId?: string | null, imageUrl?: string | null, tags?: string[]): Promise<CommunityPost> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('未登录')
   const trimmed = content.trim()
@@ -485,7 +485,59 @@ export async function createPost(content: string, bookId?: string | null, imageU
     .select('*, profiles!community_posts_user_id_profiles_fkey(username, avatar_url)')
     .single()
   if (error) throw error
-  return { ...data, like_count: 0, liked_by_me: false }
+
+  // 写入话题标签
+  if (tags && tags.length) {
+    const uniqueTags = [...new Set(tags.filter(t => t.length > 0))]
+    if (uniqueTags.length) {
+      await supabase.from('post_tags').insert(
+        uniqueTags.map(tag => ({ post_id: data.id, tag }))
+      )
+    }
+  }
+
+  return { ...data, like_count: 0, liked_by_me: false, tags: tags || [] } as any
+}
+
+/** 列出某话题下的帖子 */
+export async function listPostsByTag(tag: string, limit = 30) {
+  const { data, error } = await supabase
+    .from('post_tags')
+    .select(`
+      post_id,
+      community_posts!inner(
+        *,
+        profiles!community_posts_user_id_profiles_fkey(username, avatar_url)
+      )
+    `)
+    .eq('tag', tag)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data || []).map((row: any) => row.community_posts)
+}
+
+/** 列出某帖子的所有标签 */
+export async function listPostTags(postId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('post_tags')
+    .select('tag')
+    .eq('post_id', postId)
+  if (error) return []
+  return (data || []).map((r: any) => r.tag)
+}
+
+/** 模糊搜索 username（用于 @mention 自动补全） */
+export async function searchUsernames(query: string, limit = 8): Promise<{ id: string; username: string; avatar_url: string | null }[]> {
+  const q = query.replace(/^@/, '').trim()
+  if (!q) return []
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .ilike('username', `%${q}%`)
+    .limit(limit)
+  if (error) return []
+  return (data || []) as any
 }
 
 /** 删除自己的帖子 */
