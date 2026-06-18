@@ -96,7 +96,7 @@ onMounted(async () => {
     book.value = loaded
     const me = await currentUserId()
     console.log('[reader] currentUserId =', me, 'book.user_id =', loaded?.user_id, 'match =', loaded?.user_id === me)
-    if (me && loaded.user_id !== me) {
+    if (me && loaded.user_id !== me && !loaded.is_public) {
       error.value = '无权访问此书（此书属于其他用户）'
       return
     }
@@ -134,6 +134,8 @@ const txtPage = ref(0)
 const txtTotalPages = ref(1)
 const progressPct = ref(0)
 const txtSlideDir = ref<'next' | 'prev' | ''>('')  // 翻页动画方向
+const epubCurrentPage = ref(0)
+const epubTotalPages = ref(0)
 
 // 根据视口高度动态计算每页字符数
 function calcTxtPageSize(): number {
@@ -296,8 +298,15 @@ function nextPage() {
 
 function jumpToInputPage() {
   const page = +(pageInputValue.value || 1)
-  txtPage.value = Math.max(0, Math.min(page - 1, txtTotalPages.value - 1))
-  applyTxtPage()
+  if (book.value?.file_format === 'epub') {
+    if (epubTotalPages.value === 0 || !epubBook?.locations) return
+    const targetPage = Math.max(1, Math.min(page, epubTotalPages.value))
+    const cfi = epubBook.locations.cfiFromLocation(targetPage - 1)
+    if (cfi) epubRendition?.display(cfi)
+  } else {
+    txtPage.value = Math.max(0, Math.min(page - 1, txtTotalPages.value - 1))
+    applyTxtPage()
+  }
   pageInputVisible.value = false
 }
 
@@ -371,7 +380,7 @@ async function renderEpub() {
   epubJsBook.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
   epubJsBook.on?.('closed', () => console.log('[reader] book closed'))
 
-  // 翻页：键盘左右
+  // 翻页：键盘左右（外部 window 监听，用于非 epub 格式也生效）
   if (epubKeyHandler) window.removeEventListener('keydown', epubKeyHandler)
   epubKeyHandler = (e: KeyboardEvent) => {
     if (!epubRendition) return
@@ -380,39 +389,44 @@ async function renderEpub() {
   }
   window.addEventListener('keydown', epubKeyHandler, { passive: false })
 
-  // 触摸：左右滑/点击翻页（所有格式统一）
-  if (readerRef.value) {
-    detachSwipeListeners()
-    let touchStartX = 0
-    touchStartHandler = (e: TouchEvent) => {
-      touchStartX = e.changedTouches[0]?.clientX ?? 0
-    }
-    touchEndHandler = (e: TouchEvent) => {
-      if (isSwiping) return
-      const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX
-      try {
-        if (Math.abs(dx) > 40) {
-          isSwiping = true
-          setTimeout(() => { isSwiping = false }, 350)
-          if (dx < 0) nextPage()
-          else prevPage()
-        } else if (Math.abs(dx) < 15) {
-          const x = e.changedTouches[0]?.clientX ?? 0
-          const w = readerRef.value?.clientWidth ?? 0
-          if (w < 768) {
-            isSwiping = true
-            setTimeout(() => { isSwiping = false }, 350)
-            if (x < w / 3) prevPage()
-            else if (x > w * 2 / 3) nextPage()
-          }
+  // EPUB iframe 内部点击和触摸翻页（通过 epubjs hooks 注册到 iframe 内部）
+  rendition.hooks.content.register((contents: any) => {
+    try {
+      const docEl = contents.window.document.documentElement
+
+      // 点击翻页：左侧 1/3 上一页，右侧 2/3 下一页
+      docEl.addEventListener('click', (e: MouseEvent) => {
+        const w = contents.window.innerWidth
+        const x = e.clientX
+        if (x < w / 3) {
+          epubRendition?.prev()
+        } else {
+          epubRendition?.next()
         }
-      } catch (err) {
-        console.error('[reader] swipe error', err)
-      }
+      })
+
+      // 触摸滑动翻页
+      let iframeTouchStartX = 0
+      docEl.addEventListener('touchstart', (e: TouchEvent) => {
+        iframeTouchStartX = e.changedTouches[0]?.clientX ?? 0
+      }, { passive: true })
+      docEl.addEventListener('touchend', (e: TouchEvent) => {
+        const dx = (e.changedTouches[0]?.clientX ?? 0) - iframeTouchStartX
+        if (Math.abs(dx) > 40) {
+          if (dx < 0) epubRendition?.next()
+          else epubRendition?.prev()
+        }
+      }, { passive: true })
+
+      // iframe 内部键盘翻页
+      docEl.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') { epubRendition?.prev(); e.preventDefault() }
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { epubRendition?.next(); e.preventDefault() }
+      })
+    } catch (err) {
+      console.warn('[reader] iframe hook registration failed', err)
     }
-    readerRef.value.addEventListener('touchstart', touchStartHandler, { passive: true })
-    readerRef.value.addEventListener('touchend', touchEndHandler, { passive: true })
-  }
+  })
 
   try {
     await Promise.race([
@@ -433,7 +447,12 @@ async function renderEpub() {
 
   // 异步生成 location（必须在 display() 之后，否则会破坏 layout 导致 view 高度变 0）
   epubJsBook.locations.generate(1024).then(() => {
-    console.log('[reader] locations generated, total =', epubJsBook.locations.length?.())
+    epubTotalPages.value = epubJsBook.locations.length()
+    console.log('[reader] locations generated, total pages =', epubTotalPages.value)
+    // 重新计算当前页码
+    if (epubTotalPages.value > 0) {
+      epubCurrentPage.value = Math.max(1, Math.round(progressPct.value / 100 * epubTotalPages.value))
+    }
   }).catch((e: any) => {
     console.warn('[reader] locations.generate failed', e)
   })
@@ -459,6 +478,10 @@ async function renderEpub() {
     // paginated 模式用 percentageFromCfi 计算进度
     const pct = epubJsBook.locations?.percentageFromCfi?.(loc.start.cfi)
     progressPct.value = Math.round((typeof pct === 'number' ? pct : 0) * 100)
+    // 计算当前页码
+    if (epubTotalPages.value > 0) {
+      epubCurrentPage.value = Math.max(1, Math.round(progressPct.value / 100 * epubTotalPages.value))
+    }
     scheduleSaveProgress(loc.start.cfi)
   })
   rendition.on('selected', (cfiRange: string, contents: any) => {
@@ -829,7 +852,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <!-- 快速跳转页码 -->
           <span class="cursor-pointer" @click="pageInputVisible = true" v-if="!pageInputVisible">
             <template v-if="book.file_format === 'epub'">
-              {{ Math.round(progressPct) }}%
+              <template v-if="epubTotalPages > 0">
+                第 {{ epubCurrentPage }} / {{ epubTotalPages }} 页
+              </template>
+              <template v-else>
+                {{ Math.round(progressPct) }}%
+              </template>
             </template>
             <template v-else>
               第 {{ txtPage + 1 }} / {{ txtTotalPages }} 页
@@ -842,7 +870,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               class="input w-20 text-center text-sm"
               type="number"
               min="1"
-              :max="txtTotalPages"
+              :max="book.file_format === 'epub' ? epubTotalPages : txtTotalPages"
               placeholder="页码"
               @blur="pageInputVisible = false"
             />

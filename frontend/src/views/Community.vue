@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
   listPublicBooks, listActivityFeed, searchPublicBooksFulltext,
@@ -10,6 +10,7 @@ import {
 } from '@/lib/books'
 import { toast } from '@/lib/toast'
 import { debounce } from '@/lib/utils'
+import { maskUsername } from '@/lib/privacy'
 import { supabase } from '@/lib/supabase'
 import { splitContent } from '@/lib/parse'
 import { subscribeCommunityFeed } from '@/lib/realtime'
@@ -26,6 +27,7 @@ import LoginPrompt from '@/components/LoginPrompt.vue'
 import { maskEmail } from '@/lib/privacy'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const tab = ref<'feed' | 'books' | 'people'>('feed')
 const q = ref('')
@@ -101,6 +103,23 @@ async function refresh() {
   } finally {
     loading.value = false
   }
+  // 检查是否需要滚动到特定帖子（从通知跳转过来）
+  await nextTick()
+  const targetPostId = route.query.post as string
+  if (targetPostId) {
+    scrollToPost(targetPostId)
+  }
+}
+
+function scrollToPost(postId: string) {
+  nextTick(() => {
+    const el = document.getElementById(`post-${postId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      flashPostId.value = postId
+      setTimeout(() => { flashPostId.value = null }, 3000)
+    }
+  })
 }
 
 const refreshDebounced = debounce(refresh, 300)
@@ -341,7 +360,7 @@ async function deleteOwnPost(p: CommunityPost) {
         <Skeleton variant="circle" width="36px" height="36px" />
         <div class="flex-1 space-y-2">
           <Skeleton variant="text" width="40%" />
-          <Skeleton variant="text" rows="2" />
+          <Skeleton variant="text" :rows="2" />
         </div>
       </div>
     </div>
@@ -359,13 +378,14 @@ async function deleteOwnPost(p: CommunityPost) {
       <!-- 用户帖子 -->
       <TransitionGroup name="stagger" tag="div" class="space-y-3">
       <div v-for="p in posts" :key="p.id"
+           :id="`post-${p.id}`"
            class="card p-4 flex gap-3 transition-all"
            :class="flashPostId === p.id ? 'ring-2 ring-neon-purple shadow-[0_0_28px_rgba(168,85,247,0.55)]' : ''">
         <UserAvatar :user="p.profiles" size="sm" clickable @click="openUser(p.user_id)" />
         <div class="flex-1 min-w-0">
           <div class="text-sm flex items-center gap-2 flex-wrap">
             <span class="font-medium text-ink-50 cursor-pointer hover:underline" @click="openUser(p.user_id)">
-              {{ p.profiles?.username || '匿名' }}
+              {{ p.user_id === auth.user?.id ? (p.profiles?.username || '匿名') : maskUsername(p.profiles?.username) }}
             </span>
             <span class="text-xs text-ink-300">{{ timeAgo(p.created_at) }}</span>
           </div>
@@ -423,7 +443,7 @@ async function deleteOwnPost(p: CommunityPost) {
         <div class="flex-1 min-w-0">
           <div class="text-sm">
             <span class="font-medium text-ink-50 cursor-pointer hover:underline" @click="openUser(a.user_id)">
-              {{ a.profiles?.username || '匿名' }}
+              {{ a.user_id === auth.user?.id ? (a.profiles?.username || '匿名') : maskUsername(a.profiles?.username) }}
             </span>
             <span class="text-ink-200 ml-1"> {{ activityText(a) }}</span>
           </div>
@@ -467,7 +487,7 @@ async function deleteOwnPost(p: CommunityPost) {
       <div v-for="p in people" :key="p.id" class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-[0_0_24px_rgba(168,85,247,0.3)] hover:border-neon-purple/40 transition" @click="openUser(p.id)">
         <UserAvatar :user="p" size="md" />
         <div class="flex-1 min-w-0">
-          <div class="font-medium text-sm text-ink-50">{{ p.username || '匿名' }}</div>
+          <div class="font-medium text-sm text-ink-50">{{ p.id === auth.user?.id ? (p.username || '匿名') : maskUsername(p.username) }}</div>
           <div class="text-xs text-ink-300 truncate">{{ p.bio || '这个人很懒，什么也没写' }}</div>
         </div>
         <span class="text-xs text-neon-purple">查看 →</span>

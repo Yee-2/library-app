@@ -7,6 +7,7 @@ import {
 } from '@/lib/books'
 import { toast } from '@/lib/toast'
 import { useAuthStore } from '@/stores/auth'
+import { maskUsername } from '@/lib/privacy'
 import { ArrowLeft, Upload, Trophy, BookOpen, Pencil } from 'lucide-vue-next'
 import BookCard from '@/components/BookCard.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
@@ -148,7 +149,7 @@ async function saveBio() {
               </label>
             </div>
             <div class="flex-1 min-w-0">
-              <div class="font-bold text-lg tracking-tight text-ink-50">{{ profile?.username || '匿名用户' }}</div>
+              <div class="font-bold text-lg tracking-tight text-ink-50">{{ isMe ? (profile?.username || '匿名用户') : maskUsername(profile?.username) }}</div>
               <div v-if="!editingBio" class="flex items-start gap-2 mt-0.5">
                 <span class="text-sm text-ink-300 flex-1">{{ profile?.bio || '这个人很懒，什么也没写' }}</span>
                 <button v-if="isMe" @click="startEditBio" class="text-xs text-neon-purple hover:underline flex-shrink-0 flex items-center gap-0.5">

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { listPublicBooks, getPublicBookUrl, uploadBook } from '@/lib/books'
+import { listPublicBooks, getPublicBookUrl, uploadBook, findMyDuplicate } from '@/lib/books'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/lib/toast'
 import { formatBytes, formatDate } from '@/lib/utils'
@@ -75,11 +75,20 @@ async function borrowToMyShelf(b: PubBook) {
     showLoginPrompt.value = true
     return
   }
+  // 去重检查
+  const existing = await findMyDuplicate(b.title)
+  if (existing) {
+    toast.info('这本书已经在你的书架中了')
+    router.push('/library')
+    return
+  }
   if (!confirm(`将《${b.title}》加入我的书架？`)) return
   try {
     const url = await getPublicBookUrl(b.id)
     const res = await fetch(url)
+    if (!res.ok) throw new Error('文件下载失败: HTTP ' + res.status)
     const blob = await res.blob()
+    if (blob.size === 0) throw new Error('文件为空')
     const file = new File([blob], `${b.title}.${b.file_format}`, { type: blob.type })
     await uploadBook(file, {
       title: b.title,
@@ -89,6 +98,7 @@ async function borrowToMyShelf(b: PubBook) {
     toast.success('已加入我的书架')
     router.push('/library')
   } catch (e: any) {
+    console.error('[borrow]', e)
     toast.error('借阅失败：' + e.message)
   }
 }

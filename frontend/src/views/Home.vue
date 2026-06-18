@@ -8,6 +8,7 @@ import { Search, BookOpen, Users, Trophy, BarChart3, Sparkles, Palette, Star } f
 import BookCard from '@/components/BookCard.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import LoginPrompt from '@/components/LoginPrompt.vue'
+import { maskUsername } from '@/lib/privacy'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -113,7 +114,7 @@ function onBookClick(id: string) {
           <UserAvatar :user="a.profiles" size="sm" />
           <div class="flex-1 min-w-0">
             <div class="text-sm">
-              <span class="font-medium">{{ a.profiles?.username || '匿名' }}</span>
+              <span class="font-medium">{{ maskUsername(a.profiles?.username) }}</span>
               <span class="text-ink-200 ml-1">
                 {{ a.type === 'book_shared' ? `公开了《${a.metadata?.title}》` :
                    a.type === 'review_added' ? `打了一篇书评` :

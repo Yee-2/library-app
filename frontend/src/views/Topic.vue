@@ -81,7 +81,7 @@ function handleClick(content: string, e: MouseEvent) {
       <div v-for="i in 3" :key="i" class="card p-4 flex gap-3">
         <Skeleton variant="circle" width="36px" height="36px" />
         <div class="flex-1">
-          <Skeleton variant="text" rows="2" />
+          <Skeleton variant="text" :rows="2" />
         </div>
       </div>
     </div>

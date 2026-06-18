@@ -4,10 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import {
-  getBook, getPublicBookUrl, getMyBookFileUrl, listReviews, upsertReview, toggleFavorite, uploadBook
+  getBook, getPublicBookUrl, getMyBookFileUrl, listReviews, upsertReview, toggleFavorite, uploadBook, findMyDuplicate
 } from '@/lib/books'
 import { toast } from '@/lib/toast'
 import { formatDate } from '@/lib/utils'
+import { maskUsername } from '@/lib/privacy'
 import { ArrowLeft, BookOpen, Download, Star, User, Hash, Type, FileText } from 'lucide-vue-next'
 import UserAvatar from '@/components/UserAvatar.vue'
 import LoginPrompt from '@/components/LoginPrompt.vue'
@@ -21,6 +22,7 @@ const book = ref<any>(null)
 const reviews = ref<any[]>([])
 const isFav = ref(false)
 const loading = ref(false)
+const error = ref('')
 const showReview = ref(false)
 const rRating = ref(5)
 const rContent = ref('')
@@ -29,6 +31,7 @@ const showLoginPrompt = ref(false)
 
 async function refresh() {
   loading.value = true
+  error.value = ''
   try {
     book.value = await getBook(bookId.value)
     reviews.value = await listReviews(bookId.value)
@@ -36,6 +39,9 @@ async function refresh() {
       const { data } = await supabase.from('favorites').select('user_id').eq('user_id', auth.user!.id).eq('book_id', bookId.value).maybeSingle()
       isFav.value = !!data
     }
+  } catch (e: any) {
+    console.error('[BookDetail] refresh error:', e)
+    error.value = e.message || '加载失败'
   } finally {
     loading.value = false
   }
@@ -45,13 +51,23 @@ onMounted(refresh)
 
 async function borrow() {
   if (!auth.isLoggedIn) { showLoginPrompt.value = true; return }
+  // 去重检查
+  const existing = await findMyDuplicate(book.value.title)
+  if (existing) {
+    toast.info('这本书已经在你的书架中了')
+    router.push('/library')
+    return
+  }
   actionLoading.value = true
   try {
     const url = await getPublicBookUrl(bookId.value)
     const res = await fetch(url)
+    if (!res.ok) throw new Error('文件下载失败: HTTP ' + res.status)
     const blob = await res.blob()
+    if (blob.size === 0) throw new Error('文件为空')
     const file = new File([blob], `${book.value.title}.${book.value.file_format}`, { type: blob.type })
     await uploadBook(file, { title: book.value.title, author: book.value.author, description: book.value.description })
+    toast.success('借阅成功！已加入书架')
     router.push('/library')
   } catch (e: any) {
     console.error('[borrow]', e)
@@ -119,6 +135,11 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
 
     <div v-if="loading" class="text-center text-ink-300 py-8">加载中…</div>
 
+    <div v-else-if="error" class="text-center py-16">
+      <p class="text-red-500 mb-2">{{ error }}</p>
+      <button @click="$router.back()" class="btn-secondary">返回</button>
+    </div>
+
     <div v-else-if="book">
       <!-- 头部 -->
       <div class="card p-5 mb-4 flex gap-5">
@@ -169,7 +190,7 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
            @click="book.profiles?.username && router.push(`/user/${book.user_id}`)">
         <UserAvatar :user="book.profiles" size="sm" />
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium">{{ book.profiles?.username || '匿名' }}</div>
+          <div class="text-sm font-medium">{{ isOwner ? (book.profiles?.username || '匿名') : maskUsername(book.profiles?.username) }}</div>
           <div class="text-xs text-ink-300">分享于 {{ formatDate(book.created_at) }}</div>
         </div>
         <span class="text-xs text-ink-300">查看主页 ›</span>

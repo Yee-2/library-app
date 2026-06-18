@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { listMyBooks, uploadBook, deleteBook, togglePublic } from '@/lib/books'
+import { listMyBooks, uploadBook, deleteBook, togglePublic, findMyPublicDuplicate } from '@/lib/books'
 import { detectFormat } from '@/lib/books'
 import { toast } from '@/lib/toast'
 import { formatBytes, formatDate } from '@/lib/utils'
@@ -28,6 +28,7 @@ const author = ref('')
 const description = ref('')
 const isPublic = ref(false)
 const coverFile = ref<File | null>(null)
+const coverPreview = ref<string | null>(null)
 
 const formats = ['all', 'epub', 'pdf', 'txt', 'mobi'] as const
 
@@ -67,11 +68,24 @@ function onFilePick(e: Event) {
   if (!title.value) title.value = f.name.replace(/\.[^.]+$/, '')
 }
 function onCoverPick(e: Event) {
-  coverFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+  const f = (e.target as HTMLInputElement).files?.[0] ?? null
+  coverFile.value = f
+  if (f) {
+    coverPreview.value = URL.createObjectURL(f)
+  } else {
+    coverPreview.value = null
+  }
 }
 
 async function doUpload() {
   if (!file.value) return toast.error('请选择文件')
+  // 公开上传去重检查
+  if (isPublic.value) {
+    const dup = await findMyPublicDuplicate(title.value)
+    if (dup) {
+      if (!confirm('你已经公开过同名书籍，确定要再次上传吗？')) return
+    }
+  }
   uploading.value = true
   try {
     await uploadBook(file.value, {
@@ -84,6 +98,7 @@ async function doUpload() {
     showUpload.value = false
     file.value = null
     coverFile.value = null
+    coverPreview.value = null
     title.value = ''
     author.value = ''
     description.value = ''
@@ -252,6 +267,9 @@ function readBook(b: Book | string) {
             <div>
               <label class="text-xs font-medium text-ink-200 mb-1.5 block">封面图（可选）</label>
               <input type="file" accept="image/*" @change="onCoverPick" class="block w-full text-sm text-ink-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-neon-purple/15 file:text-neon-purple hover:file:bg-neon-purple/25" />
+              <div v-if="coverPreview" class="mt-2">
+                <img :src="coverPreview" class="w-20 h-28 object-cover rounded-lg border border-neon-purple/20" alt="封面预览" />
+              </div>
             </div>
             <label class="flex items-center gap-3 cursor-pointer select-none">
               <span class="relative inline-flex items-center">

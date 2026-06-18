@@ -135,7 +135,7 @@ onBeforeUnmount(() => {
               >
                 <div
                   v-if="menuOpen"
-                  class="absolute right-0 mt-2 w-56 glass-panel rounded-2xl shadow-2xl py-1.5 text-sm origin-top-right z-50"
+                  class="absolute right-0 mt-2 w-56 bg-ink-850 border border-neon-purple/20 rounded-2xl shadow-2xl py-1.5 text-sm origin-top-right z-50"
                   @click="menuOpen = false"
                 >
                   <div class="px-3 py-2 border-b border-neon-purple/15">

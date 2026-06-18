@@ -5,6 +5,7 @@ import { listNotifications, markRead, markAllRead, type Notification } from '@/l
 import { ArrowLeft, MessageCircle, CheckCheck } from 'lucide-vue-next'
 import UserAvatar from '@/components/UserAvatar.vue'
 import Skeleton from '@/components/Skeleton.vue'
+import { maskUsername } from '@/lib/privacy'
 
 const router = useRouter()
 const notifications = ref<Notification[]>([])
@@ -32,7 +33,8 @@ function timeAgo(iso: string) {
 function openNotif(n: Notification) {
   markRead(n.id)
   n.read = true
-  router.push(`/topic/${encodeURIComponent('#动态')}`)
+  // 导航到社区页面，并传递 post_id 以定位到具体帖子
+  router.push({ path: '/community', query: { post: n.post_id } })
 }
 
 async function readAll() {
@@ -65,7 +67,7 @@ async function readAll() {
         <Skeleton variant="circle" width="36px" height="36px" />
         <div class="flex-1 space-y-2">
           <Skeleton variant="text" width="40%" />
-          <Skeleton variant="text" rows="2" />
+          <Skeleton variant="text" :rows="2" />
         </div>
       </div>
     </div>
@@ -92,7 +94,7 @@ async function readAll() {
         </div>
         <div class="flex-1 min-w-0">
           <div class="text-sm">
-            <span class="font-medium text-ink-50">{{ n.actor_name }}</span>
+            <span class="font-medium text-ink-50">{{ maskUsername(n.actor_name) }}</span>
             <span class="text-ink-300 ml-1">回复了你的帖子</span>
           </div>
           <p class="text-xs text-ink-400 mt-1 line-clamp-2">{{ n.comment_content }}</p>

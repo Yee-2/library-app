@@ -14,6 +14,7 @@ import { Trash2, CornerDownRight, Send } from 'lucide-vue-next'
 import UserAvatar from '@/components/UserAvatar.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import LoginPrompt from '@/components/LoginPrompt.vue'
+import { maskUsername } from '@/lib/privacy'
 
 const props = defineProps<{
   postId: string
@@ -172,7 +173,7 @@ function openUser(id: string) { router.push(`/user/${id}`) }
         <div v-if="loading" class="space-y-2">
           <div v-for="i in 2" :key="i" class="flex gap-2">
             <Skeleton variant="circle" width="24px" height="24px" />
-            <Skeleton variant="text" rows="2" />
+            <Skeleton variant="text" :rows="2" />
           </div>
         </div>
 
@@ -189,7 +190,7 @@ function openUser(id: string) { router.push(`/user/${id}`) }
                 <div class="flex items-center gap-2 mb-0.5">
                   <span class="text-xs font-medium text-ink-50 cursor-pointer hover:underline"
                         @click="openUser(c.user_id)">
-                    {{ c.profiles?.username || '匿名' }}
+                    {{ c.user_id === auth.user?.id ? (c.profiles?.username || '匿名') : maskUsername(c.profiles?.username) }}
                   </span>
                   <span class="text-[10px] text-ink-300">{{ timeAgo(c.created_at) }}</span>
                 </div>
@@ -215,7 +216,7 @@ function openUser(id: string) { router.push(`/user/${id}`) }
                       <div class="flex items-center gap-2 mb-0.5">
                         <span class="text-xs font-medium text-ink-50 cursor-pointer hover:underline"
                               @click="openUser(r.user_id)">
-                          {{ r.profiles?.username || '匿名' }}
+                          {{ r.user_id === auth.user?.id ? (r.profiles?.username || '匿名') : maskUsername(r.profiles?.username) }}
                         </span>
                         <span class="text-[10px] text-ink-300">{{ timeAgo(r.created_at) }}</span>
                       </div>

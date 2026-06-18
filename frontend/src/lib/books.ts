@@ -45,7 +45,9 @@ export async function uploadBook(file: File, meta: {
     const coverPath = `${user.id}/${coverId}.${coverExt}`
     const { error: coverErr } = await supabase.storage
       .from('book-covers')
-      .upload(coverPath, meta.coverFile)
+      .upload(coverPath, meta.coverFile, {
+        contentType: meta.coverFile.type || 'image/jpeg',
+      })
     if (!coverErr) {
       const { data: pub } = supabase.storage.from('book-covers').getPublicUrl(coverPath)
       coverUrl = pub.publicUrl
@@ -109,12 +111,24 @@ export async function listPublicBooks(opts: { q?: string; page?: number; pageSiz
 }
 
 export async function getBook(id: string) {
-  const { data, error } = await supabase
+  // 优先带 profiles JOIN（获取分享者用户名）
+  let { data, error } = await supabase
     .from('books')
     .select('*, profiles!books_user_id_profiles_fkey(username)')
     .eq('id', id)
-    .single()
-  if (error) throw error
+    .maybeSingle()
+
+  // JOIN 失败时降级：不带 profiles 查询
+  if (error || !data) {
+    const fallback = await supabase
+      .from('books')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+    if (fallback.error) throw fallback.error
+    if (!fallback.data) throw new Error('书籍不存在或已被删除')
+    data = { ...fallback.data, profiles: null }
+  }
   return data
 }
 
@@ -146,16 +160,57 @@ export async function getMyBookFileUrl(book: Book) {
 
 export async function getPublicBookUrl(bookId: string) {
   const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch(`${FUNCTIONS_URL}/public-book-url`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-    },
-    body: JSON.stringify({ book_id: bookId }),
-  })
-  if (!res.ok) throw new Error('获取下载链接失败')
-  return (await res.json()).url as string
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15000)  // 15s 超时
+
+  try {
+    const res = await fetch(`${FUNCTIONS_URL}/public-book-url`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
+      body: JSON.stringify({ book_id: bookId }),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`获取下载链接失败 (${res.status}): ${text || '服务暂时不可用'}`)
+    }
+    return (await res.json()).url as string
+  } catch (e: any) {
+    if (e.name === 'AbortError') throw new Error('请求超时，请检查网络后重试')
+    throw e
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+/** 检查用户是否已拥有同名书籍 */
+export async function findMyDuplicate(title: string): Promise<Book | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data } = await supabase
+    .from('books')
+    .select('*')
+    .eq('user_id', user.id)
+    .ilike('title', title.trim())
+    .maybeSingle()
+  return data as Book | null
+}
+
+/** 检查用户是否已公开同名书籍 */
+export async function findMyPublicDuplicate(title: string): Promise<Book | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data } = await supabase
+    .from('books')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('is_public', true)
+    .ilike('title', title.trim())
+    .maybeSingle()
+  return data as Book | null
 }
 
 // =============== 头像 / 资料编辑 ===============
