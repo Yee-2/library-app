@@ -70,7 +70,8 @@ async function toggleFollow() {
 }
 
 function readBook(b: any) {
-  router.push(`/book/${b.id}`)
+  const id = typeof b === 'string' ? b : b.id
+  router.push(`/book/${id}`)
 }
 
 const isMe = computed(() => auth.user?.id === userId.value)

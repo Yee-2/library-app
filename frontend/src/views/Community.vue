@@ -150,7 +150,8 @@ onActivated(refresh)
 onBeforeUnmount(() => { unsubRealtime?.() })
 
 function readBook(b: any) {
-  router.push(`/book/${b.id}`)
+  const id = typeof b === 'string' ? b : b.id
+  router.push(`/book/${id}`)
 }
 
 function openUser(id: string) {
@@ -311,7 +312,7 @@ async function deleteOwnPost(p: CommunityPost) {
 <template>
   <div class="max-w-3xl mx-auto px-4 py-4">
     <!-- 顶部标题栏 -->
-    <div class="flex items-center justify-between mb-4 sticky top-0 bg-ink-900/80 backdrop-blur-md z-10 py-3 -mx-4 px-4 border-b border-neon-purple/10">
+    <div class="flex items-center justify-between mb-4 sticky top-0 bg-white/80 dark:bg-ink-900/80 backdrop-blur-md z-10 py-3 -mx-4 px-4 border-b border-neon-purple/10">
       <div class="flex items-center gap-2">
         <h1 class="text-2xl font-bold tracking-tight text-ink-50">社区</h1>
         <span class="text-xs text-ink-300 hidden sm:inline">读书人的小圈子</span>

@@ -218,7 +218,7 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
           </button>
         </div>
 
-        <div v-if="showReview" class="bg-ink-900 rounded-xl p-3 mb-3 space-y-2">
+        <div v-if="showReview" class="bg-ink-100 dark:bg-ink-900 rounded-xl p-3 mb-3 space-y-2">
           <div class="flex items-center gap-1">
             <span class="text-xs text-ink-300 mr-2">评分</span>
             <button v-for="n in 5" :key="n" @click="rRating = n" class="p-0.5 transition-transform hover:scale-110">

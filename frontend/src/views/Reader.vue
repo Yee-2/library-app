@@ -1066,7 +1066,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <div class="flex-1 overflow-auto space-y-1">
           <div v-for="(ch, i) in chapters" :key="ch.id || i"
                @click="book?.file_format === 'epub' ? gotoEpubChapter(ch) : jumpToChapter(ch.index!)"
-               class="card p-3 cursor-pointer hover:bg-ink-900 transition text-sm"
+               class="card p-3 cursor-pointer hover:bg-ink-100 dark:hover:bg-ink-900 transition text-sm"
                :title="ch.label">
             <div class="truncate">{{ i + 1 }}. {{ ch.label }}</div>
           </div>

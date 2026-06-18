@@ -69,7 +69,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col bg-ink-900">
+  <div class="min-h-screen flex flex-col bg-white dark:bg-ink-900">
     <!-- 顶部导航（仅在非 tab 页面显示） -->
     <header
       v-if="!showTabBar"
