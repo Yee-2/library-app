@@ -84,7 +84,7 @@ async function borrowToMyShelf(b: PubBook) {
       author: b.author ?? undefined,
       description: b.description ?? undefined,
     })
-    toast.error('已加入我的书架')
+    toast.success('已加入我的书架')
     router.push('/library')
   } catch (e: any) {
     toast.error('借阅失败：' + e.message)
