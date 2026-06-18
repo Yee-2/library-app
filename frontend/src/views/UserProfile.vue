@@ -5,6 +5,7 @@ import {
   getUserProfile, listUserPublicBooks, isFollowing, followUser, unfollowUser,
   uploadAvatar, updateMyProfile
 } from '@/lib/books'
+import { toast } from '@/lib/toast'
 import { useAuthStore } from '@/stores/auth'
 import { ArrowLeft, Upload, Trophy, BookOpen, Pencil } from 'lucide-vue-next'
 import BookCard from '@/components/BookCard.vue'
@@ -57,7 +58,7 @@ async function toggleFollow() {
       following.value = true
     }
   } catch (e: any) {
-    alert(e.message)
+    toast.error(e.message)
   }
 }
 
@@ -76,7 +77,7 @@ async function onAvatarChange(e: Event) {
     const url = await uploadAvatar(file)
     profile.value = { ...profile.value, avatar_url: url }
   } catch (err: any) {
-    alert('上传失败：' + err.message)
+    toast.error('上传失败：' + err.message)
   } finally {
     uploadingAvatar.value = false
     if (avatarFileInput.value) avatarFileInput.value.value = ''
@@ -99,7 +100,7 @@ async function saveBio() {
     profile.value = { ...profile.value, ...updated }
     editingBio.value = false
   } catch (e: any) {
-    alert('保存失败：' + e.message)
+    toast.error('保存失败：' + e.message)
   } finally {
     savingBio.value = false
   }

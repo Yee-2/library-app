@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { listMyBooks, uploadBook, deleteBook, togglePublic } from '@/lib/books'
 import { detectFormat } from '@/lib/books'
+import { toast } from '@/lib/toast'
 import { formatBytes, formatDate } from '@/lib/utils'
 import type { Book } from '@/types'
 import { Upload, Search, Star, BarChart3, X, Globe, Lock, Trash2, BookOpen } from 'lucide-vue-next'
@@ -42,7 +43,7 @@ async function refresh() {
   try {
     books.value = await listMyBooks()
   } catch (e: any) {
-    alert('加载失败：' + e.message)
+    toast.error('加载失败：' + e.message)
   } finally {
     loading.value = false
   }
@@ -54,7 +55,7 @@ function onFilePick(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]
   if (!f) return
   if (!detectFormat(f.name)) {
-    alert('仅支持 epub / pdf / txt / mobi 格式')
+    toast.error('仅支持 epub / pdf / txt / mobi 格式')
     return
   }
   file.value = f
@@ -65,7 +66,7 @@ function onCoverPick(e: Event) {
 }
 
 async function doUpload() {
-  if (!file.value) return alert('请选择文件')
+  if (!file.value) return toast.error('请选择文件')
   uploading.value = true
   try {
     await uploadBook(file.value, {
@@ -84,7 +85,7 @@ async function doUpload() {
     isPublic.value = false
     await refresh()
   } catch (e: any) {
-    alert('上传失败：' + e.message)
+    toast.error('上传失败：' + e.message)
   } finally {
     uploading.value = false
   }
@@ -96,7 +97,7 @@ async function handleDelete(b: Book) {
     await deleteBook(b)
     await refresh()
   } catch (e: any) {
-    alert('删除失败：' + e.message)
+    toast.error('删除失败：' + e.message)
   }
 }
 
@@ -108,7 +109,7 @@ async function handleTogglePublic(b: Book) {
     const ach = useAchievementsStore()
     await ach.checkAll()
   } catch (e: any) {
-    alert('操作失败：' + e.message)
+    toast.error('操作失败：' + e.message)
   }
 }
 

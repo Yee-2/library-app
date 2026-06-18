@@ -2,6 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { listPublicBooks, getPublicBookUrl, uploadBook } from '@/lib/books'
 import { useAuthStore } from '@/stores/auth'
+import { toast } from '@/lib/toast'
 import { formatBytes, formatDate } from '@/lib/utils'
 import { useRouter } from 'vue-router'
 import { Search, Download, BookOpen } from 'lucide-vue-next'
@@ -33,7 +34,7 @@ async function refresh() {
   try {
     books.value = await listPublicBooks({ q: q.value || undefined })
   } catch (e: any) {
-    alert('加载失败：' + e.message)
+    toast.error('加载失败：' + e.message)
   } finally {
     loading.value = false
   }
@@ -61,7 +62,7 @@ async function download(b: PubBook) {
     a.click()
     await refresh()
   } catch (e: any) {
-    alert('下载失败：' + e.message)
+    toast.error('下载失败：' + e.message)
   } finally {
     downloading.value = null
   }
@@ -83,10 +84,10 @@ async function borrowToMyShelf(b: PubBook) {
       author: b.author ?? undefined,
       description: b.description ?? undefined,
     })
-    alert('已加入我的书架')
+    toast.error('已加入我的书架')
     router.push('/library')
   } catch (e: any) {
-    alert('借阅失败：' + e.message)
+    toast.error('借阅失败：' + e.message)
   }
 }
 

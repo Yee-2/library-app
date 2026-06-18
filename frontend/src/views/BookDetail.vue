@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import {
   getBook, getPublicBookUrl, getMyBookFileUrl, listReviews, upsertReview, toggleFavorite, uploadBook
 } from '@/lib/books'
+import { toast } from '@/lib/toast'
 import { formatDate } from '@/lib/utils'
 import { ArrowLeft, BookOpen, Download, Star, User, Hash, Type, FileText } from 'lucide-vue-next'
 import UserAvatar from '@/components/UserAvatar.vue'
@@ -52,7 +53,7 @@ async function borrow() {
     router.push('/library')
   } catch (e: any) {
     console.error('[borrow]', e)
-    alert('借阅失败：' + e.message)
+    toast.error('借阅失败：' + e.message)
   } finally {
     actionLoading.value = false
   }
@@ -68,7 +69,7 @@ async function download() {
     a.target = '_blank'
     a.click()
   } catch (e: any) {
-    alert('下载失败：' + e.message)
+    toast.error('下载失败：' + e.message)
   }
 }
 
@@ -82,7 +83,7 @@ async function fav() {
     await toggleFavorite(bookId.value, isFav.value)
     isFav.value = !isFav.value
   } catch (e: any) {
-    alert(e.message)
+    toast.error(e.message)
   }
 }
 
@@ -93,7 +94,7 @@ async function submitReview() {
     rContent.value = ''
     await refresh()
   } catch (e: any) {
-    alert('发布失败：' + e.message)
+    toast.error('发布失败：' + e.message)
   }
 }
 

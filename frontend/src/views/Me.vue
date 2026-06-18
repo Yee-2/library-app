@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { listMyAchievements, listAllAchievements, listMyFavorites, listMyBooks, getMyReadingSummary, getUserProfile, uploadAvatar } from '@/lib/books'
+import { toast } from '@/lib/toast'
 import { BookOpen, Star, BarChart3, Trophy, UserRound, IdCard, Flame, LogOut, Upload, ChevronRight, Sparkles } from 'lucide-vue-next'
 import UserAvatar from '@/components/UserAvatar.vue'
 import NicknamePrompt from '@/components/NicknamePrompt.vue'
@@ -77,7 +78,7 @@ async function onAvatarChange(e: Event) {
     const url = await uploadAvatar(file)
     myProfile.value = { ...(myProfile.value || {}), avatar_url: url }
   } catch (err: any) {
-    alert('上传失败：' + err.message)
+    toast.error('上传失败：' + err.message)
   } finally {
     uploadingAvatar.value = false
     if (avatarInput.value) avatarInput.value.value = ''
