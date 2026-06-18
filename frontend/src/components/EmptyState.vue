@@ -30,20 +30,20 @@ const paddingClass = ({ sm: 'py-8', md: 'py-12', lg: 'py-16' } as const)[props.s
   <div :class="['flex flex-col items-center justify-center text-center', paddingClass]">
     <div
       v-if="icon"
-      class="w-20 h-20 rounded-3xl bg-gradient-to-br from-neon-purple/30 to-neon-pink/20
-             border border-neon-purple/30 flex items-center justify-center mb-4
-             shadow-[0_0_30px_rgba(168,85,247,0.3)]"
+      class="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary-200 to-accent-200
+             border border-primary-200 flex items-center justify-center mb-4
+             shadow-lg"
     >
-      <component :is="icon" class="w-10 h-10 text-neon-purple/80" :stroke-width="1.5" />
+      <component :is="icon" class="w-10 h-10 text-primary-600/80" :stroke-width="1.5" />
     </div>
-    <h3 class="text-base font-semibold text-ink-100">{{ title }}</h3>
+    <h3 class="text-base font-semibold text-ink-600">{{ title }}</h3>
     <p v-if="description" class="text-sm text-ink-300 mt-1.5 max-w-xs">{{ description }}</p>
     <button
       v-if="actionLabel"
       @click="onAction"
       class="mt-5 inline-flex items-center justify-center h-10 px-5 rounded-xl
-             bg-gradient-to-r from-neon-purple to-neon-pink text-white text-sm font-medium
-             shadow-lg hover:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all"
+             bg-gradient-to-r from-primary-600 to-accent-600 text-white text-sm font-medium
+             shadow-lg hover:shadow-md transition-all"
     >
       {{ actionLabel }}
     </button>

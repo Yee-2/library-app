@@ -67,20 +67,20 @@ function close() {
       >
         <div
           class="w-full max-w-sm glass-panel rounded-3xl p-6 shadow-2xl
-                 border border-neon-purple/30 shadow-[0_0_40px_rgba(168,85,247,0.25)]"
+                 border border-primary-200 shadow-lg"
         >
           <div class="flex items-start justify-between mb-4">
             <div class="flex items-center gap-2">
-              <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-neon-purple/40 to-neon-pink/30
-                          flex items-center justify-center border border-neon-purple/30">
-                <Sparkles class="w-5 h-5 text-neon-pink" :stroke-width="2" />
+              <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary-300 to-accent-200
+                          flex items-center justify-center border border-primary-200">
+                <Sparkles class="w-5 h-5 text-accent-600" :stroke-width="2" />
               </div>
               <div>
-                <h3 class="font-semibold text-ink-50">设置你的昵称</h3>
+                <h3 class="font-semibold text-ink-800">设置你的昵称</h3>
                 <p class="text-xs text-ink-300 mt-0.5">让社区认识你（不再使用邮箱前缀）</p>
               </div>
             </div>
-            <button @click="close" class="text-ink-300 hover:text-ink-50 p-1">
+            <button @click="close" class="text-ink-300 hover:text-ink-800 p-1">
               <X class="w-5 h-5" :stroke-width="1.75" />
             </button>
           </div>

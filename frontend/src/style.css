@@ -4,97 +4,53 @@
 @tailwind utilities;
 
 /* ========================================================================
-   主题系统 - 通过 CSS 变量在 :root (light) / :root.dark (默认) 之间切换
+   主题系统 - 专业浅色主题（单模式）
    ======================================================================== */
 :root {
-  /* 背景 */
-  --bg-body-from: #f5f3ff;
-  --bg-body-mid:  #ede9fe;
-  --bg-body-to:   #e0e7ff;
-  --bg-text:      #1f2937;
+  /* 背景渐变 */
+  --bg-body-from: #fafafa;
+  --bg-body-mid:  #f4f4f5;
+  --bg-body-to:   #eef2ff;
+  --bg-text:      #18181b;
 
-  /* 玻璃面板 (light) */
-  --glass-bg:    rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(168, 85, 247, 0.25);
+  /* 玻璃面板 */
+  --glass-bg:     rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.06);
 
-  /* 卡片 (light) */
-  --card-bg:     rgba(255, 255, 255, 0.85);
-  --card-border: rgba(168, 85, 247, 0.15);
+  /* 卡片 */
+  --card-bg:      #ffffff;
+  --card-border:  rgba(0, 0, 0, 0.06);
 
-  /* 输入框 (light) */
+  /* 输入框 */
   --input-bg:     #ffffff;
-  --input-border: #e9d5ff;
-  --input-text:   #1f2937;
+  --input-border: #e4e4e7;
+  --input-text:   #18181b;
 
-  /* 滚动条 (light) */
-  --scrollbar-thumb: rgba(168, 85, 247, 0.3);
-  --scrollbar-thumb-hover: rgba(168, 85, 247, 0.6);
+  /* 滚动条 */
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
 
-  /* 骨架屏 (light) */
-  --skeleton-from: rgba(168, 85, 247, 0.06);
-  --skeleton-mid:  rgba(168, 85, 247, 0.18);
-  --skeleton-to:   rgba(168, 85, 247, 0.06);
+  /* 骨架屏 */
+  --skeleton-from: rgba(0, 0, 0, 0.04);
+  --skeleton-mid:  rgba(0, 0, 0, 0.08);
+  --skeleton-to:   rgba(0, 0, 0, 0.04);
 
-  /* 文字 ink-* 调色板（亮色模式下用深色）*/
-  --ink-50:  #f5f3ff;
-  --ink-100: #ede9fe;
-  --ink-200: #c4b5fd;
-  --ink-300: #6b21a8;
-  --ink-400: #581c87;
-  --ink-500: #4c1d95;
-  --ink-600: #3b1d6e;
-  --ink-700: #2e1065;
-  --ink-800: #1a0f33;
-  --ink-850: #27164a;
-  --ink-900: #1a0f33;
-  --ink-950: #0f0820;
+  /* ink-* 中性灰阶 */
+  --ink-50:  #fafafa;
+  --ink-100: #f4f4f5;
+  --ink-200: #e4e4e7;
+  --ink-300: #a1a1aa;
+  --ink-400: #71717a;
+  --ink-500: #52525b;
+  --ink-600: #3f3f46;
+  --ink-700: #27272a;
+  --ink-800: #18181b;
+  --ink-850: #141416;
+  --ink-900: #09090b;
+  --ink-950: #040405;
 }
 
-:root.dark {
-  /* 背景 (深色) */
-  --bg-body-from: #0f0820;
-  --bg-body-mid:  #1a0f33;
-  --bg-body-to:   #27164a;
-  --bg-text:      #f5f3ff;
-
-  /* 玻璃面板 (深色) */
-  --glass-bg:    rgba(39, 22, 74, 0.55);
-  --glass-border: rgba(168, 85, 247, 0.18);
-
-  /* 卡片 (深色) */
-  --card-bg:     rgba(39, 22, 74, 0.55);
-  --card-border: rgba(168, 85, 247, 0.15);
-
-  /* 输入框 (深色) */
-  --input-bg:     rgba(39, 22, 74, 0.6);
-  --input-border: rgba(168, 85, 247, 0.2);
-  --input-text:   #f5f3ff;
-
-  /* 滚动条 (深色) */
-  --scrollbar-thumb: rgba(168, 85, 247, 0.3);
-  --scrollbar-thumb-hover: rgba(168, 85, 247, 0.6);
-
-  /* 骨架屏 (深色) */
-  --skeleton-from: rgba(139, 92, 246, 0.08);
-  --skeleton-mid:  rgba(168, 85, 247, 0.2);
-  --skeleton-to:   rgba(139, 92, 246, 0.08);
-
-  /* 文字 ink-* 调色板（深色模式下用浅色） */
-  --ink-50:  #f5f3ff;
-  --ink-100: #e9e5ff;
-  --ink-200: #c4b5fd;
-  --ink-300: #a78bfa;
-  --ink-400: #8b5cf6;
-  --ink-500: #7c3aed;
-  --ink-600: #6d28d9;
-  --ink-700: #5b21b6;
-  --ink-800: #3b1d6e;
-  --ink-850: #27164a;
-  --ink-900: #1a0f33;
-  --ink-950: #0f0820;
-}
-
-/* 把 Tailwind 的 ink 色映射到 CSS 变量（这样业务代码用 bg-ink-900 等自动跟随主题） */
+/* ink-* 工具类映射到 CSS 变量 */
 @layer utilities {
   .bg-ink-50  { background-color: var(--ink-50); }
   .bg-ink-100 { background-color: var(--ink-100); }
@@ -118,7 +74,6 @@
   .border-ink-800 { border-color: var(--ink-800); }
   .border-ink-900 { border-color: var(--ink-900); }
 
-  /* 主题感知渐变 */
   .from-ink-800 { --tw-gradient-from: var(--ink-800); }
   .to-ink-850   { --tw-gradient-to: var(--ink-850); }
   .from-ink-900 { --tw-gradient-from: var(--ink-900); }
@@ -137,7 +92,6 @@ body {
   background-attachment: fixed;
   color: var(--bg-text);
   min-height: 100vh;
-  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* 滚动条 */
@@ -146,7 +100,7 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* 阅读器样式变量（由 JS 动态注入，不受主题切换影响） */
+/* 阅读器样式变量（由 JS 动态注入） */
 .reader-area {
   font-size: var(--reader-font-size, 18px);
   line-height: var(--reader-line-height, 1.8);
@@ -249,27 +203,26 @@ body {
   .btn { @apply inline-flex items-center justify-center gap-1.5 px-4 h-10 rounded-xl text-sm font-medium
          transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
          select-none whitespace-nowrap; }
-  .btn-primary   { @apply btn bg-gradient-to-r from-neon-purple to-neon-pink text-white shadow-lg
-                   hover:shadow-[0_0_24px_rgba(168,85,247,0.55)]; }
-  .btn-secondary { @apply btn border text-ink-700 dark:text-ink-100 border-neon-purple/20
-                   bg-white/60 dark:bg-ink-800/60
-                   hover:border-neon-purple/40 hover:bg-neon-purple/10; }
-  .btn-ghost     { @apply btn text-ink-700 dark:text-ink-200 hover:bg-neon-purple/10 hover:text-neon-purple; }
+  .btn-primary   { @apply btn bg-primary-600 text-white shadow-sm
+                   hover:bg-primary-700 hover:shadow-md; }
+  .btn-secondary { @apply btn border text-ink-700 border-ink-200
+                   bg-white hover:border-primary-300 hover:bg-primary-50; }
+  .btn-ghost     { @apply btn text-ink-600 hover:bg-ink-100 hover:text-ink-800; }
   .btn-danger    { @apply btn bg-rose-500 text-white shadow-sm hover:bg-rose-400; }
   .btn-icon      { @apply btn p-0 w-10 h-10 rounded-xl; }
 
   .input { @apply w-full px-3.5 h-10 rounded-xl border
-          text-ink-900 dark:text-ink-50 placeholder:text-ink-300 dark:placeholder:text-ink-300
-          focus:outline-none focus:ring-2 focus:ring-neon-purple/40 focus:border-neon-purple/60 transition;
+          text-ink-800 placeholder:text-ink-300
+          focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400 transition;
           background: var(--input-bg);
           border-color: var(--input-border); }
 
   .card { @apply rounded-2xl transition;
           background: var(--card-bg);
           border: 1px solid var(--card-border);
-          backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-  .card-hover { @apply card hover:shadow-[0_0_28px_rgba(168,85,247,0.35)]
-                hover:border-neon-purple/40 hover:-translate-y-0.5 transition-all duration-200; }
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04); }
+  .card-hover { @apply card hover:shadow-md hover:border-primary-200
+                hover:-translate-y-0.5 transition-all duration-200; }
 
   /* 玻璃面板 */
   .glass-panel {
@@ -278,13 +231,6 @@ body {
     -webkit-backdrop-filter: blur(14px);
     border: 1px solid var(--glass-border);
   }
-
-  /* 霓虹辉光 */
-  .neon-glow-purple { box-shadow: 0 0 20px rgba(168,85,247,0.4), 0 0 40px rgba(168,85,247,0.15); }
-  .neon-glow-pink   { box-shadow: 0 0 20px rgba(236,72,153,0.4), 0 0 40px rgba(236,72,153,0.15); }
-  .neon-text-purple { text-shadow: 0 0 12px rgba(168,85,247,0.7); }
-  .neon-text-pink   { text-shadow: 0 0 12px rgba(236,72,153,0.7); }
-  .neon-border      { border: 1px solid rgba(168,85,247,0.3); }
 }
 
 /* 加载骨架屏 */
@@ -303,11 +249,11 @@ body {
 .badge {
   @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
 }
-.badge-brand  { @apply badge bg-neon-purple/15 text-neon-purple border border-neon-purple/25; }
-.badge-gray   { @apply badge bg-ink-200/30 dark:bg-ink-800/60 text-ink-700 dark:text-ink-200; }
-.badge-green  { @apply badge bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-400/20; }
-.badge-amber  { @apply badge bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-400/20; }
-.badge-pink   { @apply badge bg-neon-pink/15 text-neon-pink border border-neon-pink/25; }
+.badge-brand  { @apply badge bg-primary-100 text-primary-700 border border-primary-200; }
+.badge-gray   { @apply badge bg-ink-100 text-ink-600 border border-ink-200; }
+.badge-green  { @apply badge bg-emerald-50 text-emerald-600 border border-emerald-200; }
+.badge-amber  { @apply badge bg-amber-50 text-amber-600 border border-amber-200; }
+.badge-pink   { @apply badge bg-pink-50 text-pink-600 border border-pink-200; }
 
 /* 文字截断 */
 .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
@@ -315,5 +261,5 @@ body {
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* @提及 / #话题 链接样式 */
-.post-link-mention { @apply text-neon-purple font-medium hover:underline cursor-pointer; }
-.post-link-tag     { @apply text-neon-pink font-medium hover:underline cursor-pointer; }
+.post-link-mention { @apply text-primary-600 font-medium hover:underline cursor-pointer; }
+.post-link-tag     { @apply text-accent-600 font-medium hover:underline cursor-pointer; }

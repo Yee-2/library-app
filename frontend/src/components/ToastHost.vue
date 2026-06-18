@@ -39,13 +39,13 @@ const COLOR: Record<string, string> = {
           :key="t.id"
           class="pointer-events-auto glass-panel rounded-2xl px-4 py-2.5 flex items-center gap-2
                  min-w-[200px] max-w-[420px] shadow-2xl
-                 border border-neon-purple/30"
+                 border border-primary-200"
         >
           <component :is="ICON[t.kind]" class="w-4 h-4 flex-shrink-0" :class="COLOR[t.kind]" :stroke-width="2" />
-          <span class="text-sm text-ink-900 dark:text-ink-50 flex-1 leading-snug">{{ t.message }}</span>
+          <span class="text-sm text-ink-900-50 flex-1 leading-snug">{{ t.message }}</span>
           <button
             @click="toast.remove(t.id)"
-            class="text-ink-300 hover:text-ink-900 dark:hover:text-ink-50 transition -mr-1"
+            class="text-ink-300 hover:text-ink-900-50 transition -mr-1"
           >
             <X class="w-3.5 h-3.5" :stroke-width="1.75" />
           </button>

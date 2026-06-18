@@ -39,14 +39,14 @@ const emit = defineEmits<{ (e: 'open', id: string): void }>()
       <span
         v-if="book.is_public === true"
         class="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full
-               bg-emerald-500/150/90 text-white text-[10px] font-medium backdrop-blur-sm"
+               bg-emerald-500/90 text-white text-[10px] font-medium backdrop-blur-sm"
       >
         <Globe class="w-3 h-3" :stroke-width="2.5" />公开
       </span>
       <span
         v-else-if="book.is_public === false"
         class="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full
-               bg-ink-800/70 text-white text-[10px] font-medium backdrop-blur-sm"
+               bg-ink-200 text-white text-[10px] font-medium backdrop-blur-sm"
       >
         <Lock class="w-3 h-3" :stroke-width="2.5" />私密
       </span>
@@ -65,7 +65,7 @@ const emit = defineEmits<{ (e: 'open', id: string): void }>()
         v-if="typeof book.progress === 'number' && book.progress > 0"
         class="absolute bottom-0 left-0 right-0 h-1 bg-black/20"
       >
-        <div class="h-full bg-neon-purple/150" :style="{ width: book.progress + '%' }"></div>
+        <div class="h-full bg-primary-1000" :style="{ width: book.progress + '%' }"></div>
       </div>
 
       <!-- hover 浮层 -->
@@ -74,7 +74,7 @@ const emit = defineEmits<{ (e: 'open', id: string): void }>()
                 opacity-0 group-hover:opacity-100 transition-all duration-200
                 flex items-end justify-center pb-3"
       >
-        <span class="px-3 py-1.5 rounded-full bg-ink-850/95 text-ink-50 text-xs font-medium shadow">
+        <span class="px-3 py-1.5 rounded-full bg-white shadow-sm text-ink-800 text-xs font-medium shadow">
           打开
         </span>
       </div>

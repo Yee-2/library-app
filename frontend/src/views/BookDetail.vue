@@ -156,7 +156,7 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
     <div v-else-if="book">
       <!-- 头部 -->
       <div class="card p-5 mb-4 flex gap-5">
-        <div class="w-32 sm:w-36 flex-shrink-0 aspect-[3/4] bg-ink-800/60 rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-lg">
+        <div class="w-32 sm:w-36 flex-shrink-0 aspect-[3/4] bg-ink-100 rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-lg">
           <img v-if="book.cover_url" :src="book.cover_url" class="w-full h-full object-cover" :alt="book.title" />
           <div v-else class="w-full h-full flex items-center justify-center">
             <BookOpen class="w-12 h-12 text-ink-300" :stroke-width="1.5" />
@@ -166,7 +166,7 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
           <h1 class="text-xl font-bold line-clamp-2 tracking-tight">{{ book.title }}</h1>
           <p class="text-sm text-ink-300 mt-1">{{ book.author || '佚名' }}</p>
           <div class="flex items-center gap-2 mt-2 text-xs text-ink-300">
-            <span class="px-1.5 py-0.5 rounded bg-ink-800/60 font-mono uppercase">{{ book.file_format }}</span>
+            <span class="px-1.5 py-0.5 rounded bg-ink-100 font-mono uppercase">{{ book.file_format }}</span>
             <span>{{ (book.file_size / 1024 / 1024).toFixed(2) }} MB</span>
             <span>↓ {{ book.download_count }} 次</span>
           </div>
@@ -175,7 +175,7 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
             <span class="font-semibold">{{ avgRating }}</span>
             <span class="text-ink-300 text-xs">· {{ reviews.length }} 评</span>
           </div>
-          <p v-if="book.description" class="text-sm text-ink-200 mt-3 line-clamp-4 leading-relaxed">{{ book.description }}</p>
+          <p v-if="book.description" class="text-sm text-ink-500 mt-3 line-clamp-4 leading-relaxed">{{ book.description }}</p>
         </div>
       </div>
 
@@ -199,7 +199,7 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
       </div>
 
       <!-- 分享者 -->
-      <div class="card p-3 mb-4 flex items-center gap-3 cursor-pointer hover:shadow-[0_0_24px_rgba(168,85,247,0.3)] hover:border-neon-purple/40 transition"
+      <div class="card p-3 mb-4 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-primary-300 transition"
            @click="book.profiles?.username && router.push(`/user/${book.user_id}`)">
         <UserAvatar :user="book.profiles" size="sm" />
         <div class="flex-1 min-w-0">
@@ -213,12 +213,12 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
       <div class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold tracking-tight">书评 ({{ reviews.length }})</h3>
-          <button v-if="auth.isLoggedIn" @click="showReview = !showReview" class="text-sm text-neon-purple hover:underline">
+          <button v-if="auth.isLoggedIn" @click="showReview = !showReview" class="text-sm text-primary-600 hover:underline">
             {{ showReview ? '取消' : '写书评' }}
           </button>
         </div>
 
-        <div v-if="showReview" class="bg-ink-100 dark:bg-ink-900 rounded-xl p-3 mb-3 space-y-2">
+        <div v-if="showReview" class="bg-ink-100-900 rounded-xl p-3 mb-3 space-y-2">
           <div class="flex items-center gap-1">
             <span class="text-xs text-ink-300 mr-2">评分</span>
             <button v-for="n in 5" :key="n" @click="rRating = n" class="p-0.5 transition-transform hover:scale-110">
@@ -239,18 +239,18 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
           <p class="text-ink-300 text-sm">还没有书评</p>
         </div>
         <div v-else class="space-y-3">
-          <div v-for="r in reviews" :key="r.id" class="border-b border-neon-purple/15 last:border-0 pb-3 last:pb-0">
+          <div v-for="r in reviews" :key="r.id" class="border-b border-primary-100 last:border-0 pb-3 last:pb-0">
             <div class="flex items-center gap-2">
               <UserAvatar :user="r.profiles" size="xs" />
               <span class="text-sm font-medium">{{ r.user_id === auth.user?.id ? (r.profiles?.username || '匿名') : maskUsername(r.profiles?.username) }}</span>
               <div class="flex">
                 <Star v-for="n in 5" :key="n" class="w-3.5 h-3.5"
                       :fill="n <= r.rating ? 'currentColor' : 'none'"
-                      :class="n <= r.rating ? 'text-amber-300' : 'text-ink-200'" :stroke-width="1" />
+                      :class="n <= r.rating ? 'text-amber-300' : 'text-ink-500'" :stroke-width="1" />
               </div>
               <span class="text-xs text-ink-300 ml-auto">{{ formatDate(r.created_at) }}</span>
             </div>
-            <p v-if="r.content" class="text-sm text-ink-200 mt-1.5 ml-9 leading-relaxed">{{ r.content }}</p>
+            <p v-if="r.content" class="text-sm text-ink-500 mt-1.5 ml-9 leading-relaxed">{{ r.content }}</p>
           </div>
         </div>
       </div>

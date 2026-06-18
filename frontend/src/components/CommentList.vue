@@ -131,10 +131,10 @@ function openUser(id: string) { router.push(`/user/${id}`) }
 </script>
 
 <template>
-  <div class="mt-2.5 border-t border-neon-purple/15 pt-3">
+  <div class="mt-2.5 border-t border-primary-100 pt-3">
     <button
       @click="toggle"
-      class="text-xs flex items-center gap-1 text-ink-300 hover:text-neon-purple transition group"
+      class="text-xs flex items-center gap-1 text-ink-300 hover:text-primary-600 transition group"
     >
       <CornerDownRight class="w-3.5 h-3.5 group-hover:rotate-[-30deg] transition" :stroke-width="1.75" />
       <span>{{ open ? '收起' : '展开' }}评论 ({{ open ? list.length : (initialCount ?? '·') }})</span>
@@ -186,18 +186,18 @@ function openUser(id: string) { router.push(`/user/${id}`) }
           <div v-for="c in rootComments" :key="c.id" class="flex gap-2">
             <UserAvatar :user="c.profiles" size="xs" clickable @click="openUser(c.user_id)" />
             <div class="flex-1 min-w-0">
-              <div class="rounded-xl bg-ink-800/40 px-3 py-2 border border-neon-purple/10">
+              <div class="rounded-xl bg-ink-50 px-3 py-2 border border-primary-600/10">
                 <div class="flex items-center gap-2 mb-0.5">
-                  <span class="text-xs font-medium text-ink-50 cursor-pointer hover:underline"
+                  <span class="text-xs font-medium text-ink-800 cursor-pointer hover:underline"
                         @click="openUser(c.user_id)">
                     {{ c.user_id === auth.user?.id ? (c.profiles?.username || '匿名') : maskUsername(c.profiles?.username) }}
                   </span>
                   <span class="text-[10px] text-ink-300">{{ timeAgo(c.created_at) }}</span>
                 </div>
-                <p class="text-xs text-ink-100 whitespace-pre-wrap break-words">{{ c.content }}</p>
+                <p class="text-xs text-ink-600 whitespace-pre-wrap break-words">{{ c.content }}</p>
               </div>
               <div class="flex items-center gap-3 mt-1 text-[10px] text-ink-300">
-                <button class="hover:text-neon-purple transition" @click="openReply(c)">回复</button>
+                <button class="hover:text-primary-600 transition" @click="openReply(c)">回复</button>
                 <button
                   v-if="auth.user?.id === c.user_id"
                   class="hover:text-rose-400 transition flex items-center gap-0.5"
@@ -208,19 +208,19 @@ function openUser(id: string) { router.push(`/user/${id}`) }
               </div>
 
               <!-- 回复 -->
-              <div v-if="repliesOf(c.id).length" class="mt-2 ml-2 space-y-2 border-l-2 border-neon-purple/15 pl-3">
+              <div v-if="repliesOf(c.id).length" class="mt-2 ml-2 space-y-2 border-l-2 border-primary-100 pl-3">
                 <div v-for="r in repliesOf(c.id)" :key="r.id" class="flex gap-2">
                   <UserAvatar :user="r.profiles" size="xs" clickable @click="openUser(r.user_id)" />
                   <div class="flex-1 min-w-0">
-                    <div class="rounded-xl bg-ink-800/40 px-3 py-2 border border-neon-purple/10">
+                    <div class="rounded-xl bg-ink-50 px-3 py-2 border border-primary-600/10">
                       <div class="flex items-center gap-2 mb-0.5">
-                        <span class="text-xs font-medium text-ink-50 cursor-pointer hover:underline"
+                        <span class="text-xs font-medium text-ink-800 cursor-pointer hover:underline"
                               @click="openUser(r.user_id)">
                           {{ r.user_id === auth.user?.id ? (r.profiles?.username || '匿名') : maskUsername(r.profiles?.username) }}
                         </span>
                         <span class="text-[10px] text-ink-300">{{ timeAgo(r.created_at) }}</span>
                       </div>
-                      <p class="text-xs text-ink-100 whitespace-pre-wrap break-words">{{ r.content }}</p>
+                      <p class="text-xs text-ink-600 whitespace-pre-wrap break-words">{{ r.content }}</p>
                     </div>
                     <div class="flex items-center gap-3 mt-1 text-[10px] text-ink-300">
                       <button

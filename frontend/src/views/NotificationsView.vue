@@ -55,7 +55,7 @@ async function readAll() {
       <button
         v-if="notifications.some(n => !n.read)"
         @click="readAll"
-        class="text-xs text-neon-purple flex items-center gap-1 hover:underline"
+        class="text-xs text-primary-600 flex items-center gap-1 hover:underline"
       >
         <CheckCheck class="w-3.5 h-3.5" :stroke-width="1.75" />
         全部已读
@@ -83,18 +83,18 @@ async function readAll() {
         v-for="n in notifications"
         :key="n.id"
         @click="openNotif(n)"
-        class="card p-4 flex gap-3 cursor-pointer transition-all hover:shadow-[0_0_24px_rgba(168,85,247,0.3)] hover:border-neon-purple/40"
-        :class="!n.read ? 'border-l-2 border-l-neon-purple' : ''"
+        class="card p-4 flex gap-3 cursor-pointer transition-all hover:shadow-md hover:border-primary-300"
+        :class="!n.read ? 'border-l-2 border-l-primary-600' : ''"
       >
         <div class="relative">
           <UserAvatar :user="{ username: n.actor_name, avatar_url: n.actor_avatar }" size="sm" />
-          <span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-neon-purple flex items-center justify-center">
+          <span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary-600 flex items-center justify-center">
             <MessageCircle class="w-2.5 h-2.5 text-white" :stroke-width="2" />
           </span>
         </div>
         <div class="flex-1 min-w-0">
           <div class="text-sm">
-            <span class="font-medium text-ink-50">{{ maskUsername(n.actor_name) }}</span>
+            <span class="font-medium text-ink-800">{{ maskUsername(n.actor_name) }}</span>
             <span class="text-ink-300 ml-1">回复了你的帖子</span>
           </div>
           <p class="text-xs text-ink-400 mt-1 line-clamp-2">{{ n.comment_content }}</p>
@@ -103,7 +103,7 @@ async function readAll() {
           </div>
           <div class="text-[10px] text-ink-300 mt-1">{{ timeAgo(n.created_at) }}</div>
         </div>
-        <span v-if="!n.read" class="w-2 h-2 rounded-full bg-neon-purple flex-shrink-0 mt-1"></span>
+        <span v-if="!n.read" class="w-2 h-2 rounded-full bg-primary-600 flex-shrink-0 mt-1"></span>
       </div>
     </div>
   </div>

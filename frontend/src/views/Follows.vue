@@ -44,7 +44,7 @@ function open(id: string) { router.push(`/user/${id}`) }
         <ArrowLeft class="w-4 h-4" :stroke-width="1.75" />
         <span>返回</span>
       </button>
-      <h1 class="text-2xl font-bold tracking-tight text-ink-50">{{ type === 'followers' ? '粉丝' : '关注' }}</h1>
+      <h1 class="text-2xl font-bold tracking-tight text-ink-800">{{ type === 'followers' ? '粉丝' : '关注' }}</h1>
     </div>
     <div v-if="loading" class="text-center text-ink-300 py-8">加载中…</div>
     <div v-else-if="list.length === 0" class="text-center py-16">
@@ -53,14 +53,14 @@ function open(id: string) { router.push(`/user/${id}`) }
     </div>
     <div v-else class="space-y-2">
       <div v-for="item in list" :key="item.follower_id || item.followee_id"
-           class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-[0_0_24px_rgba(168,85,247,0.3)] hover:border-neon-purple/40 transition"
+           class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-primary-300 transition"
            @click="open(item.follower_id || item.followee_id)">
         <UserAvatar :user="item.profiles as any" size="md" />
         <div class="flex-1 min-w-0">
-          <div class="font-medium text-sm text-ink-50">{{ maskUsername((item.profiles as any)?.username) }}</div>
+          <div class="font-medium text-sm text-ink-800">{{ maskUsername((item.profiles as any)?.username) }}</div>
           <div class="text-xs text-ink-300">关注于 {{ new Date(item.created_at).toLocaleDateString('zh-CN') }}</div>
         </div>
-        <span class="text-xs text-neon-purple">查看 ›</span>
+        <span class="text-xs text-primary-600">查看 ›</span>
       </div>
     </div>
   </div>

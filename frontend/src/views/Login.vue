@@ -65,15 +65,15 @@ function goRedirect() {
     <div class="w-full max-w-sm">
       <!-- 品牌头 -->
       <div class="text-center mb-6">
-        <div class="inline-flex w-16 h-16 rounded-3xl bg-gradient-to-br from-neon-purple to-neon-pink items-center justify-center shadow-[0_0_32px_rgba(168,85,247,0.55)]">
+        <div class="inline-flex w-16 h-16 rounded-3xl bg-gradient-to-br from-primary-600 to-accent-600 items-center justify-center shadow-lg">
           <img src="/favicon.svg" class="w-9 h-9" alt="logo" />
         </div>
-        <h1 class="text-2xl font-bold mt-3 tracking-tight text-ink-900 dark:text-ink-50">云端图书馆</h1>
+        <h1 class="text-2xl font-bold mt-3 tracking-tight text-ink-900-50">云端图书馆</h1>
         <p class="text-xs text-ink-300 mt-1">书山有路，与君共读</p>
       </div>
 
       <div class="card p-6">
-        <h2 class="text-lg font-semibold text-center mb-1 text-ink-900 dark:text-ink-50">
+        <h2 class="text-lg font-semibold text-center mb-1 text-ink-900-50">
           {{ mode === 'signin' ? '欢迎回来' : mode === 'signup' ? '注册账号' : '找回密码' }}
         </h2>
         <p class="text-sm text-ink-300 text-center mb-5">
@@ -99,25 +99,25 @@ function goRedirect() {
                : mode === 'signup' ? '注册' : '发送重置链接') }}</span>
           </button>
 
-          <p v-if="message" :class="['text-sm text-center py-2 rounded-lg px-3', messageType === 'ok' ? 'text-emerald-600 dark:text-emerald-300 bg-emerald-500/15' : 'text-rose-600 dark:text-rose-400 bg-rose-500/15']">
+          <p v-if="message" :class="['text-sm text-center py-2 rounded-lg px-3', messageType === 'ok' ? 'text-emerald-600-300 bg-emerald-500/15' : 'text-rose-600-400 bg-rose-500/15']">
             {{ message }}
           </p>
         </form>
 
         <div class="text-center text-sm text-ink-300 mt-5 space-x-2">
           <template v-if="mode === 'signin'">
-            <button class="hover:text-neon-purple transition" @click="mode = 'forgot'">忘记密码？</button>
+            <button class="hover:text-primary-600 transition" @click="mode = 'forgot'">忘记密码？</button>
             <span>·</span>
-            <button class="text-neon-purple hover:underline font-medium" @click="mode = 'signup'">立即注册</button>
+            <button class="text-primary-600 hover:underline font-medium" @click="mode = 'signup'">立即注册</button>
           </template>
           <template v-else>
-            <button class="text-neon-purple hover:underline font-medium" @click="mode = 'signin'">返回登录</button>
+            <button class="text-primary-600 hover:underline font-medium" @click="mode = 'signin'">返回登录</button>
           </template>
         </div>
       </div>
 
       <div class="text-center mt-4">
-        <RouterLink to="/" class="inline-flex items-center gap-1 text-xs text-ink-300 hover:text-ink-50 transition">
+        <RouterLink to="/" class="inline-flex items-center gap-1 text-xs text-ink-300 hover:text-ink-800 transition">
           <ArrowLeft class="w-3 h-3" :stroke-width="1.75" />
           <span>返回首页</span>
         </RouterLink>

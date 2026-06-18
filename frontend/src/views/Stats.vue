@@ -49,7 +49,7 @@ async function drawChart() {
       datasets: [{
         label: '阅读分钟',
         data: minutes,
-        backgroundColor: '#0ea5e9',
+        backgroundColor: '#6366f1',
         borderRadius: 4,
       }],
     },
@@ -89,21 +89,21 @@ function fmtTime(sec: number) {
       <!-- 概览卡 -->
       <div class="grid grid-cols-2 gap-3 mb-4">
         <div class="card p-4 flex items-start gap-3">
-          <div class="w-10 h-10 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
+          <div class="w-10 h-10 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0">
             <Clock class="w-5 h-5" :stroke-width="1.75" />
           </div>
           <div>
             <div class="text-xs text-ink-300">近 30 天阅读</div>
-            <div class="text-2xl font-bold text-neon-purple mt-0.5">{{ fmtTime(totalSeconds) }}</div>
+            <div class="text-2xl font-bold text-primary-600 mt-0.5">{{ fmtTime(totalSeconds) }}</div>
           </div>
         </div>
         <div class="card p-4 flex items-start gap-3">
-          <div class="w-10 h-10 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
+          <div class="w-10 h-10 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0">
             <BarChart3 class="w-5 h-5" :stroke-width="1.75" />
           </div>
           <div>
             <div class="text-xs text-ink-300">日均阅读</div>
-            <div class="text-2xl font-bold text-neon-purple mt-0.5">{{ fmtTime(avgSecondsPerDay) }}</div>
+            <div class="text-2xl font-bold text-primary-600 mt-0.5">{{ fmtTime(avgSecondsPerDay) }}</div>
           </div>
         </div>
         <div class="card p-4 flex items-start gap-3">
@@ -112,7 +112,7 @@ function fmtTime(sec: number) {
           </div>
           <div>
             <div class="text-xs text-ink-300">累计字数</div>
-            <div class="text-2xl font-bold text-neon-purple mt-0.5">{{ totalWords.toLocaleString() }}</div>
+            <div class="text-2xl font-bold text-primary-600 mt-0.5">{{ totalWords.toLocaleString() }}</div>
           </div>
         </div>
         <div class="card p-4 flex items-start gap-3">
@@ -121,7 +121,7 @@ function fmtTime(sec: number) {
           </div>
           <div>
             <div class="text-xs text-ink-300">阅读会话</div>
-            <div class="text-2xl font-bold text-neon-purple mt-0.5">{{ totalSessions }}</div>
+            <div class="text-2xl font-bold text-primary-600 mt-0.5">{{ totalSessions }}</div>
           </div>
         </div>
       </div>

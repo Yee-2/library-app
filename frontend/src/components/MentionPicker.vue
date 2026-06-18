@@ -49,10 +49,10 @@ function pick(username: string) {
       <div
         class="absolute bottom-24 left-1/2 -translate-x-1/2 w-72 max-w-[92vw]
                glass-panel rounded-2xl shadow-2xl py-1.5 overflow-hidden
-               border border-neon-purple/30"
+               border border-primary-200"
         @click.stop
       >
-        <div class="px-3 py-2 text-[10px] uppercase tracking-wider text-ink-300 border-b border-neon-purple/15">
+        <div class="px-3 py-2 text-[10px] uppercase tracking-wider text-ink-300 border-b border-primary-100">
           选择用户
         </div>
         <div v-if="loading" class="px-3 py-3 text-xs text-ink-300 text-center">搜索中…</div>
@@ -63,10 +63,10 @@ function pick(username: string) {
           v-for="u in results"
           :key="u.id"
           @click="pick(u.username || '')"
-          class="w-full flex items-center gap-2 px-3 py-2 hover:bg-neon-purple/10 transition text-left"
+          class="w-full flex items-center gap-2 px-3 py-2 hover:bg-primary-600/10 transition text-left"
         >
           <UserAvatar :user="u" size="xs" />
-          <span class="text-sm text-ink-100">{{ u.username || '匿名' }}</span>
+          <span class="text-sm text-ink-600">{{ u.username || '匿名' }}</span>
         </button>
       </div>
     </div>

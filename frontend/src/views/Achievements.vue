@@ -52,7 +52,7 @@ function unlockedAt(id: string) {
           class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-2 ring-2 ring-white/15 shadow-sm"
           :class="unlocked(a.id)
             ? 'bg-gradient-to-br from-amber-500/25 to-amber-400/15'
-            : 'bg-ink-800/60'"
+            : 'bg-ink-100'"
         >
           <span v-if="a.icon" class="text-3xl">{{ a.icon }}</span>
           <Trophy v-else class="w-8 h-8 text-amber-300" :stroke-width="1.5" />

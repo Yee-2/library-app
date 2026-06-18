@@ -133,7 +133,7 @@ async function saveBio() {
     <div v-else>
       <!-- 头部 -->
       <div class="card p-5 mb-4 relative overflow-hidden">
-        <div class="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gradient-to-br from-neon-purple/20 to-fuchsia-500/20 blur-3xl" />
+        <div class="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gradient-to-br from-primary-200 to-primary-500/10 blur-3xl" />
         <div class="relative">
           <div class="flex items-center gap-4">
             <div class="relative group">
@@ -154,10 +154,10 @@ async function saveBio() {
               </label>
             </div>
             <div class="flex-1 min-w-0">
-              <div class="font-bold text-lg tracking-tight text-ink-50">{{ isMe ? (profile?.username || '匿名用户') : maskUsername(profile?.username) }}</div>
+              <div class="font-bold text-lg tracking-tight text-ink-800">{{ isMe ? (profile?.username || '匿名用户') : maskUsername(profile?.username) }}</div>
               <div v-if="!editingBio" class="flex items-start gap-2 mt-0.5">
                 <span class="text-sm text-ink-300 flex-1">{{ profile?.bio || '这个人很懒，什么也没写' }}</span>
-                <button v-if="isMe" @click="startEditBio" class="text-xs text-neon-purple hover:underline flex-shrink-0 flex items-center gap-0.5">
+                <button v-if="isMe" @click="startEditBio" class="text-xs text-primary-600 hover:underline flex-shrink-0 flex items-center gap-0.5">
                   <Pencil class="w-3 h-3" :stroke-width="1.75" />
                   <span>编辑</span>
                 </button>
@@ -189,23 +189,23 @@ async function saveBio() {
           <!-- 统计 -->
           <div class="grid grid-cols-5 gap-2 mt-5 text-center text-sm">
             <div class="py-2">
-              <div class="font-bold text-lg text-neon-purple">{{ stats?.books_count || 0 }}</div>
+              <div class="font-bold text-lg text-primary-600">{{ stats?.books_count || 0 }}</div>
               <div class="text-xs text-ink-300">藏书</div>
             </div>
             <div class="py-2">
-              <div class="font-bold text-lg text-neon-purple">{{ stats?.followers_count || 0 }}</div>
+              <div class="font-bold text-lg text-primary-600">{{ stats?.followers_count || 0 }}</div>
               <div class="text-xs text-ink-300">粉丝</div>
             </div>
             <div class="py-2">
-              <div class="font-bold text-lg text-neon-purple">{{ stats?.following_count || 0 }}</div>
+              <div class="font-bold text-lg text-primary-600">{{ stats?.following_count || 0 }}</div>
               <div class="text-xs text-ink-300">关注</div>
             </div>
             <div class="py-2">
-              <div class="font-bold text-lg text-neon-purple">{{ Math.floor((stats?.total_seconds || 0) / 3600) }}h</div>
+              <div class="font-bold text-lg text-primary-600">{{ Math.floor((stats?.total_seconds || 0) / 3600) }}h</div>
               <div class="text-xs text-ink-300">阅读</div>
             </div>
             <div class="py-2">
-              <div class="font-bold text-lg text-neon-purple">{{ stats?.achievements_count || 0 }}</div>
+              <div class="font-bold text-lg text-primary-600">{{ stats?.achievements_count || 0 }}</div>
               <div class="text-xs text-ink-300">成就</div>
             </div>
           </div>

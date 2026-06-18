@@ -118,7 +118,7 @@ function openMyFollowing() {
 <template>
   <div class="max-w-3xl mx-auto px-4 py-4">
     <!-- 头部 -->
-    <div class="card p-5 mb-3 bg-gradient-to-br from-neon-purple via-fuchsia-600 to-neon-pink text-white relative overflow-hidden">
+    <div class="card p-5 mb-3 bg-gradient-to-br from-primary-600 via-primary-700 to-accent-600 text-white relative overflow-hidden">
       <div class="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
       <div class="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
       <div class="flex items-center gap-3 relative">
@@ -153,7 +153,7 @@ function openMyFollowing() {
             class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shadow-lg"
           >{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
         </button>
-        <button v-if="!auth.isLoggedIn" @click="router.push('/login')" class="bg-ink-50 text-neon-purple px-3 py-1.5 rounded-lg text-sm font-medium">
+        <button v-if="!auth.isLoggedIn" @click="router.push('/login')" class="bg-ink-50 text-primary-600 px-3 py-1.5 rounded-lg text-sm font-medium">
           登录
         </button>
         <button v-else @click="handleLogout" class="text-white/80 text-sm hover:text-white flex items-center gap-1">
@@ -203,8 +203,8 @@ function openMyFollowing() {
     <!-- 菜单列表 -->
     <div v-if="auth.isLoggedIn" class="space-y-2">
       <div v-if="loadError" class="card p-4 text-center text-rose-400 text-sm">{{ loadError }}</div>
-      <div class="card divide-y divide-neon-purple/15">
-        <button @click="router.push('/notifications')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 dark:hover:bg-ink-900 active:bg-ink-800/60 transition">
+      <div class="card divide-y divide-primary-100">
+        <button @click="router.push('/notifications')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 active:bg-ink-100 transition">
           <span class="relative w-9 h-9 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center flex-shrink-0">
             <Bell class="w-5 h-5" :stroke-width="1.75" />
             <span
@@ -215,28 +215,28 @@ function openMyFollowing() {
           <span class="flex-1 text-left">消息通知</span>
           <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="router.push('/library')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 dark:hover:bg-ink-900 active:bg-ink-800/60 transition">
-          <span class="w-9 h-9 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
+        <button @click="router.push('/library')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 active:bg-ink-100 transition">
+          <span class="w-9 h-9 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0">
             <BookOpen class="w-5 h-5" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">我的书架</span>
           <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="router.push('/favorites')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 dark:hover:bg-ink-900 active:bg-ink-800/60 transition">
+        <button @click="router.push('/favorites')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 active:bg-ink-100 transition">
           <span class="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center flex-shrink-0">
             <Star class="w-5 h-5" :fill="'currentColor'" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">我的收藏</span>
           <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="router.push('/stats')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 dark:hover:bg-ink-900 active:bg-ink-800/60 transition">
-          <span class="w-9 h-9 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
+        <button @click="router.push('/stats')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 active:bg-ink-100 transition">
+          <span class="w-9 h-9 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0">
             <BarChart3 class="w-5 h-5" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">阅读统计</span>
           <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="router.push('/achievements')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 dark:hover:bg-ink-900 active:bg-ink-800/60 transition">
+        <button @click="router.push('/achievements')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 active:bg-ink-100 transition">
           <span class="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center flex-shrink-0">
             <Trophy class="w-5 h-5" :stroke-width="1.75" />
           </span>
@@ -244,15 +244,15 @@ function openMyFollowing() {
           <span class="text-xs text-ink-300">{{ achievements.length }}/{{ allAch.length }}</span>
           <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="openMyFollowing" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 dark:hover:bg-ink-900 active:bg-ink-800/60 transition">
+        <button @click="openMyFollowing" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 active:bg-ink-100 transition">
           <span class="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-300 flex items-center justify-center flex-shrink-0">
             <UserRound class="w-5 h-5" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">我的关注</span>
           <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="openMyProfile" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 dark:hover:bg-ink-900 active:bg-ink-800/60 transition">
-          <span class="w-9 h-9 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
+        <button @click="openMyProfile" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-100 active:bg-ink-100 transition">
+          <span class="w-9 h-9 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0">
             <IdCard class="w-5 h-5" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">个人主页</span>
@@ -264,7 +264,7 @@ function openMyFollowing() {
       <div class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold text-sm">最近成就</h3>
-          <button @click="router.push('/achievements')" class="text-xs text-neon-purple hover:underline">全部 ›</button>
+          <button @click="router.push('/achievements')" class="text-xs text-primary-600 hover:underline">全部 ›</button>
         </div>
         <div v-if="achievements.length === 0" class="text-xs text-ink-300 py-4 text-center">
           还没解锁成就，上传一本书试试

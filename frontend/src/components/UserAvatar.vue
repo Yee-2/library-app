@@ -25,16 +25,16 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ (e: 'click', evt: MouseEvent): void }>()
 
-// 8 套霓虹渐变 - 根据 username 哈希挑选
+// 8 套渐变 - 根据 username 哈希挑选
 const NEON_GRADIENTS = [
-  'from-neon-purple to-neon-pink',       // 紫粉
-  'from-neon-violet to-neon-fuchsia',    // 紫红
-  'from-neon-pink to-rose-500',          // 粉红
-  'from-neon-cyan to-neon-purple',       // 青紫
-  'from-neon-fuchsia to-neon-violet',    // 品紫
-  'from-violet-500 to-neon-cyan',        // 蓝紫
-  'from-fuchsia-500 to-neon-pink',       // 玫红
-  'from-indigo-500 to-neon-fuchsia',     // 靛紫
+  'from-primary-600 to-accent-600',
+  'from-violet-500 to-fuchsia-500',
+  'from-accent-600 to-rose-500',
+  'from-cyan-500 to-primary-600',
+  'from-fuchsia-500 to-violet-500',
+  'from-violet-500 to-cyan-500',
+  'from-primary-500 to-accent-600',
+  'from-indigo-500 to-fuchsia-500',
 ] as const
 
 function hashString(s: string): number {
@@ -79,7 +79,7 @@ function onClick(e: MouseEvent) {
       sizeClass,
       `bg-gradient-to-br ${gradientClass}`,
       ring ? 'ring-2 ring-white/15' : '',
-      glow ? 'shadow-[0_0_18px_rgba(168,85,247,0.45)]' : 'shadow-md',
+      glow ? 'shadow-lg' : 'shadow-md',
       clickable ? 'cursor-pointer hover:scale-105 transition-transform' : '',
     ]"
     @click="onClick"

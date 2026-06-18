@@ -786,7 +786,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 <template>
   <div class="h-screen flex flex-col overflow-hidden">
     <!-- 顶部工具栏 -->
-    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-neon-purple/20">
+    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-primary-200">
       <div class="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between gap-2">
         <RouterLink to="/library" class="btn-ghost -ml-2 flex items-center gap-1 text-sm">
           <ArrowLeft class="w-4 h-4" :stroke-width="1.75" />
@@ -813,8 +813,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </button>
         </div>
       </div>
-      <div class="h-0.5 bg-ink-800/60">
-        <div class="h-full bg-neon-purple/150 transition-all" :style="{ width: progressPct + '%' }"></div>
+      <div class="h-0.5 bg-ink-100">
+        <div class="h-full bg-primary-1000 transition-all" :style="{ width: progressPct + '%' }"></div>
       </div>
     </header>
 
@@ -840,7 +840,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <!-- 底部翻页 -->
     <footer
       v-if="!loading && !error && book"
-      class="sticky bottom-0 bg-ink-850/95 backdrop-blur border-t border-neon-purple/20 py-2"
+      class="sticky bottom-0 bg-white shadow-sm backdrop-blur border-t border-primary-200 py-2"
     >
       <div class="max-w-4xl mx-auto px-4 flex items-center justify-between text-sm">
         <button
@@ -901,7 +901,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               :key="f.id"
               @click="reader.setFont(f.id)"
               :class="['px-3 py-2 rounded border text-sm',
-                       reader.fontId === f.id ? 'border-brand-500 bg-neon-purple/15 text-neon-purple' : 'border-neon-purple/20']"
+                       reader.fontId === f.id ? 'border-primary-500 bg-primary-100 text-primary-600' : 'border-primary-200']"
               :style="{ fontFamily: f.family }"
             >{{ f.preview }}</button>
           </div>
@@ -938,7 +938,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               :key="t.id"
               @click="reader.setTheme(t.id)"
               :class="['h-12 rounded border-2',
-                       reader.themeId === t.id ? 'border-brand-500' : 'border-transparent']"
+                       reader.themeId === t.id ? 'border-primary-500' : 'border-transparent']"
               :style="{ background: t.bg, color: t.color }"
             >{{ t.name }}</button>
           </div>
@@ -952,7 +952,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">书签 ({{ bookmarks.length }})</h3>
           <div class="flex items-center gap-2">
-            <button @click="addCurrentBookmark" class="text-neon-purple text-sm">+ 添加当前页</button>
+            <button @click="addCurrentBookmark" class="text-primary-600 text-sm">+ 添加当前页</button>
             <button @click="showBookmarks = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
           </div>
         </div>
@@ -964,7 +964,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               <div class="text-sm">{{ b.note || `第 ${b.page} 页` }}</div>
               <div class="text-xs text-ink-300">{{ new Date(b.created_at).toLocaleString('zh-CN') }}</div>
             </div>
-            <button @click="gotoBookmark(b)" class="text-neon-purple text-sm">跳转</button>
+            <button @click="gotoBookmark(b)" class="text-primary-600 text-sm">跳转</button>
             <button @click="removeBookmark(b.id)" class="text-red-500 text-sm">删</button>
           </div>
         </div>
@@ -1014,7 +1014,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               :key="v.id"
               @click="ttsVoice = v.id; stopTTS(); startTTS()"
               :class="['px-3 py-2 rounded border text-sm text-left',
-                       ttsVoice === v.id ? 'border-brand-500 bg-neon-purple/15 text-neon-purple' : 'border-neon-purple/20']"
+                       ttsVoice === v.id ? 'border-primary-500 bg-primary-100 text-primary-600' : 'border-primary-200']"
             >{{ v.name }}</button>
           </div>
         </section>
@@ -1027,8 +1027,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
         <div v-if="ttsPlaying" class="text-xs text-ink-300 mb-3">
           正在播放 {{ ttsIndex + 1 }} / {{ ttsQueue.length }} 句
-          <div class="h-1 bg-ink-800/60 rounded mt-1">
-            <div class="h-full bg-neon-purple/150 rounded transition-all"
+          <div class="h-1 bg-ink-100 rounded mt-1">
+            <div class="h-full bg-primary-1000 rounded transition-all"
                  :style="{ width: ((ttsIndex + 1) / ttsQueue.length * 100) + '%' }"></div>
           </div>
         </div>
@@ -1066,7 +1066,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <div class="flex-1 overflow-auto space-y-1">
           <div v-for="(ch, i) in chapters" :key="ch.id || i"
                @click="book?.file_format === 'epub' ? gotoEpubChapter(ch) : jumpToChapter(ch.index!)"
-               class="card p-3 cursor-pointer hover:bg-ink-100 dark:hover:bg-ink-900 transition text-sm"
+               class="card p-3 cursor-pointer hover:bg-ink-100 transition text-sm"
                :title="ch.label">
             <div class="truncate">{{ i + 1 }}. {{ ch.label }}</div>
           </div>

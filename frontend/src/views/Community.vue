@@ -312,18 +312,18 @@ async function deleteOwnPost(p: CommunityPost) {
 <template>
   <div class="max-w-3xl mx-auto px-4 py-4">
     <!-- 顶部标题栏 -->
-    <div class="flex items-center justify-between mb-4 sticky top-0 bg-white/80 dark:bg-ink-900/80 backdrop-blur-md z-10 py-3 -mx-4 px-4 border-b border-neon-purple/10">
+    <div class="flex items-center justify-between mb-4 sticky top-0 bg-white/80 backdrop-blur-md z-10 py-3 -mx-4 px-4 border-b border-primary-600/10">
       <div class="flex items-center gap-2">
-        <h1 class="text-2xl font-bold tracking-tight text-ink-50">社区</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-ink-800">社区</h1>
         <span class="text-xs text-ink-300 hidden sm:inline">读书人的小圈子</span>
         <span class="inline-flex items-center gap-1 text-[10px] text-emerald-300 ml-1">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.9)]"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-sm"></span>
           LIVE
         </span>
       </div>
       <button
         @click="openComposer"
-        class="btn-icon btn-primary animate-pulse-neon"
+        class="btn-icon btn-primary "
         title="发动态"
       >
         <Plus class="w-5 h-5" :stroke-width="2" />
@@ -331,7 +331,7 @@ async function deleteOwnPost(p: CommunityPost) {
     </div>
 
     <!-- pill tabs -->
-    <div class="inline-flex bg-ink-800/60 rounded-full p-1 text-sm gap-1 mb-4">
+    <div class="inline-flex bg-ink-100 rounded-full p-1 text-sm gap-1 mb-4">
       <button
         v-for="t in [
           { id: 'feed', label: '动态', icon: Activity },
@@ -341,7 +341,7 @@ async function deleteOwnPost(p: CommunityPost) {
         :key="t.id"
         @click="tab = t.id; refresh()"
         :class="['px-4 h-8 rounded-full flex items-center gap-1.5 transition',
-                 tab === t.id ? 'bg-white shadow-sm font-medium text-ink-900 shadow-[0_0_14px_rgba(168,85,247,0.35)]' : 'text-ink-300 hover:text-ink-100']"
+                 tab === t.id ? 'bg-white shadow-sm font-medium text-ink-900 shadow-lg' : 'text-ink-300 hover:text-ink-600']"
       >
         <component :is="t.icon" class="w-3.5 h-3.5" :stroke-width="1.75" />
         <span>{{ t.label }}</span>
@@ -381,16 +381,16 @@ async function deleteOwnPost(p: CommunityPost) {
       <div v-for="p in posts" :key="p.id"
            :id="`post-${p.id}`"
            class="card p-4 flex gap-3 transition-all"
-           :class="flashPostId === p.id ? 'ring-2 ring-neon-purple shadow-[0_0_28px_rgba(168,85,247,0.55)]' : ''">
+           :class="flashPostId === p.id ? 'ring-2 ring-primary-600 shadow-lg' : ''">
         <UserAvatar :user="p.profiles" size="sm" clickable @click="openUser(p.user_id)" />
         <div class="flex-1 min-w-0">
           <div class="text-sm flex items-center gap-2 flex-wrap">
-            <span class="font-medium text-ink-50 cursor-pointer hover:underline" @click="openUser(p.user_id)">
+            <span class="font-medium text-ink-800 cursor-pointer hover:underline" @click="openUser(p.user_id)">
               {{ p.user_id === auth.user?.id ? (p.profiles?.username || '匿名') : maskUsername(p.profiles?.username) }}
             </span>
             <span class="text-xs text-ink-300">{{ timeAgo(p.created_at) }}</span>
           </div>
-          <div v-if="p.content" class="text-sm text-ink-100 mt-1.5 whitespace-pre-wrap break-words">
+          <div v-if="p.content" class="text-sm text-ink-600 mt-1.5 whitespace-pre-wrap break-words">
             <template v-for="(seg, i) in splitContent(p.content)" :key="i">
               <a v-if="seg.type === 'mention'" class="post-link-mention" :href="`/user/${seg.value}`">@{{ seg.value }}</a>
               <a v-else-if="seg.type === 'tag'" class="post-link-tag" :href="`/topic/${seg.value}`">#{{ seg.value }}</a>
@@ -399,26 +399,26 @@ async function deleteOwnPost(p: CommunityPost) {
           </div>
           <!-- 帖子图片 -->
           <div v-if="p.image_url" class="mt-2">
-            <img :src="p.image_url" class="rounded-xl max-h-64 object-cover border border-neon-purple/15" alt="帖子图片" loading="lazy" />
+            <img :src="p.image_url" class="rounded-xl max-h-64 object-cover border border-primary-100" alt="帖子图片" loading="lazy" />
           </div>
           <!-- 附书 -->
-          <div v-if="p.books" class="mt-2.5 flex items-center gap-2 p-2 bg-ink-800/50 rounded-xl text-xs cursor-pointer hover:bg-ink-800 transition border border-neon-purple/10"
+          <div v-if="p.books" class="mt-2.5 flex items-center gap-2 p-2 bg-ink-50 rounded-xl text-xs cursor-pointer hover:bg-ink-100 transition border border-primary-600/10"
                @click="p.book_id && router.push(`/book/${p.book_id}`)">
             <img v-if="p.books.cover_url" :src="p.books.cover_url" class="w-8 h-10 object-cover rounded-md" alt="cover" />
             <div v-else class="w-8 h-10 rounded-md bg-ink-700 flex items-center justify-center">
               <BookOpen class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
             </div>
-            <span class="line-clamp-1 flex-1 text-ink-100">{{ p.books.title }}</span>
+            <span class="line-clamp-1 flex-1 text-ink-600">{{ p.books.title }}</span>
           </div>
           <div class="flex items-center gap-4 mt-2.5">
             <button @click="toggleLike(p)" class="text-xs flex items-center gap-1 transition group">
               <Heart
                 :fill="p.liked_by_me ? 'currentColor' : 'none'"
                 :stroke-width="1.75"
-                class="w-4 h-4 group-hover:drop-shadow-[0_0_8px_rgba(236,72,153,0.7)] transition"
-                :class="p.liked_by_me ? 'text-neon-pink' : 'text-ink-300'"
+                class="w-4 h-4 group-hover:drop-shadow-lg transition"
+                :class="p.liked_by_me ? 'text-accent-600' : 'text-ink-300'"
               />
-              <span :class="p.liked_by_me ? 'text-neon-pink' : 'text-ink-300'">{{ p.like_count ?? 0 }}</span>
+              <span :class="p.liked_by_me ? 'text-accent-600' : 'text-ink-300'">{{ p.like_count ?? 0 }}</span>
             </button>
             <button v-if="auth.user?.id === p.user_id" @click="deleteOwnPost(p)" class="text-xs text-ink-300 hover:text-rose-400 ml-auto flex items-center gap-1 transition">
               <Trash2 class="w-3.5 h-3.5" :stroke-width="1.75" />
@@ -443,17 +443,17 @@ async function deleteOwnPost(p: CommunityPost) {
         <UserAvatar :user="a.profiles" size="sm" clickable @click="openUser(a.user_id)" />
         <div class="flex-1 min-w-0">
           <div class="text-sm">
-            <span class="font-medium text-ink-50 cursor-pointer hover:underline" @click="openUser(a.user_id)">
+            <span class="font-medium text-ink-800 cursor-pointer hover:underline" @click="openUser(a.user_id)">
               {{ a.user_id === auth.user?.id ? (a.profiles?.username || '匿名') : maskUsername(a.profiles?.username) }}
             </span>
-            <span class="text-ink-200 ml-1"> {{ activityText(a) }}</span>
+            <span class="text-ink-500 ml-1"> {{ activityText(a) }}</span>
           </div>
           <div class="text-xs text-ink-300 mt-0.5">{{ timeAgo(a.created_at) }}</div>
         </div>
         <button
           v-if="a.type === 'book_shared'"
           @click="readBook({ id: a.ref_id })"
-          class="text-xs text-neon-purple hover:underline"
+          class="text-xs text-primary-600 hover:underline"
         >查看</button>
       </div>
       </template>
@@ -485,13 +485,13 @@ async function deleteOwnPost(p: CommunityPost) {
         <UserRound class="w-12 h-12 mx-auto text-ink-300 mb-2" :stroke-width="1.5" />
         <p class="text-ink-300">还没看到人</p>
       </div>
-      <div v-for="p in people" :key="p.id" class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-[0_0_24px_rgba(168,85,247,0.3)] hover:border-neon-purple/40 transition" @click="openUser(p.id)">
+      <div v-for="p in people" :key="p.id" class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-primary-300 transition" @click="openUser(p.id)">
         <UserAvatar :user="p" size="md" />
         <div class="flex-1 min-w-0">
-          <div class="font-medium text-sm text-ink-50">{{ p.id === auth.user?.id ? (p.username || '匿名') : maskUsername(p.username) }}</div>
+          <div class="font-medium text-sm text-ink-800">{{ p.id === auth.user?.id ? (p.username || '匿名') : maskUsername(p.username) }}</div>
           <div class="text-xs text-ink-300 truncate">{{ p.bio || '这个人很懒，什么也没写' }}</div>
         </div>
-        <span class="text-xs text-neon-purple">查看 →</span>
+        <span class="text-xs text-primary-600">查看 →</span>
       </div>
     </div>
 
@@ -509,7 +509,7 @@ async function deleteOwnPost(p: CommunityPost) {
       >
         <div class="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col">
           <!-- 弹窗头部 -->
-          <div class="flex items-center justify-between px-4 py-3 border-b border-neon-purple/15">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-primary-100">
             <button @click="closeComposer" class="btn-icon btn-ghost -m-2">
               <X class="w-5 h-5" :stroke-width="1.75" />
             </button>
@@ -532,7 +532,7 @@ async function deleteOwnPost(p: CommunityPost) {
               rows="5"
               maxlength="2000"
               placeholder="分享你的阅读心得…使用 # 标签分类、@ 提到别人"
-              class="w-full border-0 outline-none resize-none text-sm leading-relaxed placeholder:text-ink-300 bg-transparent text-ink-50"
+              class="w-full border-0 outline-none resize-none text-sm leading-relaxed placeholder:text-ink-300 bg-transparent text-ink-800"
               style="min-height: 120px;"
             ></textarea>
 
@@ -548,7 +548,7 @@ async function deleteOwnPost(p: CommunityPost) {
 
             <!-- 图片预览 -->
             <div v-if="postImageUrl" class="mt-2 relative inline-block">
-              <img :src="postImageUrl" class="rounded-xl max-h-48 object-cover border border-neon-purple/15" alt="预览" />
+              <img :src="postImageUrl" class="rounded-xl max-h-48 object-cover border border-primary-100" alt="预览" />
               <button @click="removePostImage" class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-ink-800/80 text-white flex items-center justify-center">
                 <X class="w-3.5 h-3.5" :stroke-width="2" />
               </button>
@@ -557,9 +557,9 @@ async function deleteOwnPost(p: CommunityPost) {
           </div>
 
           <!-- 底部工具栏 -->
-          <div class="flex items-center gap-2 px-4 py-3 border-t border-neon-purple/15">
+          <div class="flex items-center gap-2 px-4 py-3 border-t border-primary-100">
             <label class="btn-icon btn-ghost cursor-pointer" title="添加图片">
-              <ImageIcon class="w-5 h-5 text-ink-200" :stroke-width="1.75" />
+              <ImageIcon class="w-5 h-5 text-ink-500" :stroke-width="1.75" />
               <input type="file" accept="image/*" class="hidden" @change="onPostImagePick" />
             </label>
             <button
@@ -567,7 +567,7 @@ async function deleteOwnPost(p: CommunityPost) {
               class="btn-icon btn-ghost"
               title="添加话题"
             >
-              <Hash class="w-5 h-5 text-ink-200" :stroke-width="1.75" />
+              <Hash class="w-5 h-5 text-ink-500" :stroke-width="1.75" />
             </button>
             <div class="relative">
               <button
@@ -586,14 +586,14 @@ async function deleteOwnPost(p: CommunityPost) {
               >
                 <div
                   v-if="showEmojiPicker"
-                  class="absolute bottom-12 left-0 bg-white border border-neon-purple/20 rounded-2xl shadow-lg p-3 w-72 max-h-48 overflow-auto z-10"
+                  class="absolute bottom-12 left-0 bg-white border border-primary-200 rounded-2xl shadow-lg p-3 w-72 max-h-48 overflow-auto z-10"
                 >
                   <div class="grid grid-cols-10 gap-1">
                     <button
                       v-for="emoji in EMOJI_LIST"
                       :key="emoji"
                       @click="insertEmoji(emoji)"
-                      class="w-7 h-7 flex items-center justify-center rounded hover:bg-ink-800/60 transition text-base"
+                      class="w-7 h-7 flex items-center justify-center rounded hover:bg-ink-100 transition text-base"
                     >{{ emoji }}</button>
                   </div>
                 </div>

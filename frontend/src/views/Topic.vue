@@ -66,15 +66,15 @@ function handleClick(content: string, e: MouseEvent) {
     </div>
 
     <div class="card p-5 mb-4 relative overflow-hidden">
-      <div class="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-neon-pink/20 blur-3xl" />
+      <div class="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-accent-200 blur-3xl" />
       <div class="relative flex items-center gap-3">
-        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-neon-purple/30 to-neon-pink/20
-                    border border-neon-purple/30 flex items-center justify-center
-                    shadow-[0_0_24px_rgba(168,85,247,0.3)]">
-          <Hash class="w-6 h-6 text-neon-pink" :stroke-width="1.75" />
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-200 to-accent-200
+                    border border-primary-200 flex items-center justify-center
+                    shadow-lg">
+          <Hash class="w-6 h-6 text-accent-600" :stroke-width="1.75" />
         </div>
         <div class="flex-1 min-w-0">
-          <h1 class="text-xl font-bold tracking-tight text-ink-50">#{{ tag }}</h1>
+          <h1 class="text-xl font-bold tracking-tight text-ink-800">#{{ tag }}</h1>
           <p class="text-xs text-ink-300 mt-0.5">话题下的所有帖子</p>
         </div>
       </div>
@@ -101,12 +101,12 @@ function handleClick(content: string, e: MouseEvent) {
         <UserAvatar :user="p.profiles" size="sm" clickable @click="openUser(p.user_id)" />
         <div class="flex-1 min-w-0">
           <div class="text-sm flex items-center gap-2 flex-wrap">
-            <span class="font-medium text-ink-50 cursor-pointer hover:underline" @click="openUser(p.user_id)">
+            <span class="font-medium text-ink-800 cursor-pointer hover:underline" @click="openUser(p.user_id)">
               {{ p.user_id === auth.user?.id ? (p.profiles?.username || '匿名') : maskUsername(p.profiles?.username) }}
             </span>
             <span class="text-xs text-ink-300">{{ timeAgo(p.created_at) }}</span>
           </div>
-          <div class="text-sm text-ink-100 mt-1.5 whitespace-pre-wrap break-words" @click="handleClick(p.content, $event)">
+          <div class="text-sm text-ink-600 mt-1.5 whitespace-pre-wrap break-words" @click="handleClick(p.content, $event)">
             <template v-for="(seg, i) in splitContent(p.content || '')" :key="i">
               <a v-if="seg.type === 'mention'" class="post-link-mention" data-type="mention" :data-username="seg.value">@{{ seg.value }}</a>
               <a v-else-if="seg.type === 'tag'" class="post-link-tag" data-type="tag" :data-tag="seg.value">#{{ seg.value }}</a>
@@ -114,12 +114,12 @@ function handleClick(content: string, e: MouseEvent) {
             </template>
           </div>
           <div v-if="p.image_url" class="mt-2">
-            <img :src="p.image_url" class="rounded-xl max-h-64 object-cover border border-neon-purple/15" />
+            <img :src="p.image_url" class="rounded-xl max-h-64 object-cover border border-primary-100" />
           </div>
-          <div v-if="p.books" class="mt-2 flex items-center gap-2 p-2 bg-ink-800/40 rounded-xl text-xs border border-neon-purple/10"
+          <div v-if="p.books" class="mt-2 flex items-center gap-2 p-2 bg-ink-50 rounded-xl text-xs border border-primary-600/10"
                @click="openPost(p.book_id)">
             <BookOpen class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
-            <span class="line-clamp-1 flex-1 text-ink-100">{{ p.books.title }}</span>
+            <span class="line-clamp-1 flex-1 text-ink-600">{{ p.books.title }}</span>
           </div>
           <div class="flex items-center gap-3 mt-2 text-xs text-ink-300">
             <Heart class="w-3.5 h-3.5" :stroke-width="1.75" />

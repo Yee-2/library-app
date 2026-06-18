@@ -45,7 +45,7 @@ function go(b: any) { router.push(`/book/${b.id}`) }
         <ArrowLeft class="w-4 h-4" :stroke-width="1.75" />
         <span>返回</span>
       </button>
-      <h1 class="text-2xl font-bold tracking-tight text-ink-50">搜索</h1>
+      <h1 class="text-2xl font-bold tracking-tight text-ink-800">搜索</h1>
     </div>
     <div class="relative mb-5">
       <SearchIcon class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-300" :stroke-width="1.75" />
@@ -69,8 +69,8 @@ function go(b: any) { router.push(`/book/${b.id}`) }
           v-for="t in quickTags"
           :key="t"
           @click="pickTag(t)"
-          class="px-3 py-1.5 rounded-lg text-xs border border-neon-purple/20 bg-ink-800/40 dark:bg-ink-800/40
-                 hover:border-neon-purple/40 hover:bg-neon-purple/10 text-ink-200 transition"
+          class="px-3 py-1.5 rounded-lg text-xs border border-primary-200 bg-ink-100
+                 hover:border-primary-300 hover:bg-primary-600/10 text-ink-500 transition"
         >{{ t }}</button>
       </div>
     </div>
@@ -82,12 +82,12 @@ function go(b: any) { router.push(`/book/${b.id}`) }
       <p class="text-ink-300">没找到相关结果</p>
     </div>
     <div v-else class="space-y-2">
-      <div v-for="b in results" :key="b.id" class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-[0_0_20px_rgba(168,85,247,0.25)] transition" @click="go(b)">
-        <div class="w-12 h-16 bg-ink-800/60 rounded-md overflow-hidden flex-shrink-0">
+      <div v-for="b in results" :key="b.id" class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition" @click="go(b)">
+        <div class="w-12 h-16 bg-ink-100 rounded-md overflow-hidden flex-shrink-0">
           <img v-if="b.cover_url" :src="b.cover_url" class="w-full h-full object-cover" :alt="b.title" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="font-medium text-sm line-clamp-1 text-ink-50">{{ b.title }}</div>
+          <div class="font-medium text-sm line-clamp-1 text-ink-800">{{ b.title }}</div>
           <div class="text-xs text-ink-300">{{ b.author || '佚名' }}</div>
           <div v-if="b.description" class="text-xs text-ink-300 line-clamp-1 mt-0.5">{{ b.description }}</div>
         </div>
