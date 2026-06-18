@@ -8,6 +8,8 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { ArrowLeft, Upload, Trophy, BookOpen, Pencil } from 'lucide-vue-next'
 import BookCard from '@/components/BookCard.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
+import Skeleton from '@/components/Skeleton.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -113,18 +115,21 @@ async function saveBio() {
       </button>
     </div>
 
-    <div v-if="loading" class="text-center text-slate-500 py-8">加载中…</div>
+    <div v-if="loading" class="space-y-3">
+      <Skeleton variant="rect" height="120px" rounded="2xl" />
+      <Skeleton variant="rect" height="180px" rounded="2xl" />
+      <Skeleton variant="rect" height="80px" rounded="2xl" />
+    </div>
 
     <div v-else>
       <!-- 头部 -->
       <div class="card p-5 mb-4 relative overflow-hidden">
-        <div class="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gradient-to-br from-brand-100 to-violet-100 blur-3xl opacity-50" />
+        <div class="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gradient-to-br from-neon-purple/20 to-fuchsia-500/20 blur-3xl" />
         <div class="relative">
           <div class="flex items-center gap-4">
             <div class="relative group">
-              <div class="w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-2xl font-bold ring-4 ring-white shadow-md">
-                <img v-if="profile?.avatar_url" :src="profile.avatar_url" class="w-full h-full object-cover" alt="avatar" />
-                <span v-else>{{ (profile?.username || '?')[0].toUpperCase() }}</span>
+              <div class="w-20 h-20 rounded-full overflow-hidden ring-4 ring-white/15 shadow-lg">
+                <UserAvatar :user="profile" size="xl" />
               </div>
               <label v-if="isMe" class="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs opacity-0 group-hover:opacity-100 cursor-pointer rounded-full transition-opacity">
                 <Upload class="w-3.5 h-3.5 mr-0.5" :stroke-width="1.75" />
@@ -140,10 +145,10 @@ async function saveBio() {
               </label>
             </div>
             <div class="flex-1 min-w-0">
-              <div class="font-bold text-lg tracking-tight">{{ profile?.username || '匿名用户' }}</div>
+              <div class="font-bold text-lg tracking-tight text-ink-50">{{ profile?.username || '匿名用户' }}</div>
               <div v-if="!editingBio" class="flex items-start gap-2 mt-0.5">
-                <span class="text-sm text-slate-500 flex-1">{{ profile?.bio || '这个人很懒，什么也没写' }}</span>
-                <button v-if="isMe" @click="startEditBio" class="text-xs text-brand-600 hover:underline flex-shrink-0 flex items-center gap-0.5">
+                <span class="text-sm text-ink-300 flex-1">{{ profile?.bio || '这个人很懒，什么也没写' }}</span>
+                <button v-if="isMe" @click="startEditBio" class="text-xs text-neon-purple hover:underline flex-shrink-0 flex items-center gap-0.5">
                   <Pencil class="w-3 h-3" :stroke-width="1.75" />
                   <span>编辑</span>
                 </button>
@@ -151,7 +156,7 @@ async function saveBio() {
               <div v-else class="mt-1">
                 <textarea v-model="bioDraft" rows="2" maxlength="200" class="input text-sm" placeholder="说说你自己…" />
                 <div class="flex justify-between items-center mt-1">
-                  <span class="text-xs text-slate-400">{{ bioDraft.length }} / 200</span>
+                  <span class="text-xs text-ink-300">{{ bioDraft.length }} / 200</span>
                   <div class="flex gap-2">
                     <button @click="cancelEditBio" class="text-xs btn-secondary px-2 py-1">取消</button>
                     <button @click="saveBio" :disabled="savingBio" class="text-xs btn-primary px-2 py-1">
@@ -160,7 +165,7 @@ async function saveBio() {
                   </div>
                 </div>
               </div>
-              <div class="text-xs text-slate-400 mt-1">加入于 {{ new Date(profile?.created_at).toLocaleDateString('zh-CN') }}</div>
+              <div class="text-xs text-ink-300 mt-1">加入于 {{ new Date(profile?.created_at).toLocaleDateString('zh-CN') }}</div>
             </div>
             <button
               v-if="!isMe"
@@ -175,24 +180,24 @@ async function saveBio() {
           <!-- 统计 -->
           <div class="grid grid-cols-5 gap-2 mt-5 text-center text-sm">
             <div class="py-2">
-              <div class="font-bold text-lg text-brand-600">{{ stats?.books_count || 0 }}</div>
-              <div class="text-xs text-slate-500">藏书</div>
+              <div class="font-bold text-lg text-neon-purple">{{ stats?.books_count || 0 }}</div>
+              <div class="text-xs text-ink-300">藏书</div>
             </div>
             <div class="py-2">
-              <div class="font-bold text-lg text-brand-600">{{ stats?.followers_count || 0 }}</div>
-              <div class="text-xs text-slate-500">粉丝</div>
+              <div class="font-bold text-lg text-neon-purple">{{ stats?.followers_count || 0 }}</div>
+              <div class="text-xs text-ink-300">粉丝</div>
             </div>
             <div class="py-2">
-              <div class="font-bold text-lg text-brand-600">{{ stats?.following_count || 0 }}</div>
-              <div class="text-xs text-slate-500">关注</div>
+              <div class="font-bold text-lg text-neon-purple">{{ stats?.following_count || 0 }}</div>
+              <div class="text-xs text-ink-300">关注</div>
             </div>
             <div class="py-2">
-              <div class="font-bold text-lg text-brand-600">{{ Math.floor((stats?.total_seconds || 0) / 3600) }}h</div>
-              <div class="text-xs text-slate-500">阅读</div>
+              <div class="font-bold text-lg text-neon-purple">{{ Math.floor((stats?.total_seconds || 0) / 3600) }}h</div>
+              <div class="text-xs text-ink-300">阅读</div>
             </div>
             <div class="py-2">
-              <div class="font-bold text-lg text-brand-600">{{ stats?.achievements_count || 0 }}</div>
-              <div class="text-xs text-slate-500">成就</div>
+              <div class="font-bold text-lg text-neon-purple">{{ stats?.achievements_count || 0 }}</div>
+              <div class="text-xs text-ink-300">成就</div>
             </div>
           </div>
         </div>
@@ -214,8 +219,8 @@ async function saveBio() {
       <div class="card p-4">
         <h3 class="font-semibold text-sm mb-3 tracking-tight">公开的图书</h3>
         <div v-if="books.length === 0" class="py-8 text-center">
-          <BookOpen class="w-10 h-10 mx-auto text-slate-300 mb-2" :stroke-width="1.5" />
-          <p class="text-sm text-slate-400">还没有公开的图书</p>
+          <BookOpen class="w-10 h-10 mx-auto text-ink-300 mb-2" :stroke-width="1.5" />
+          <p class="text-sm text-ink-300">还没有公开的图书</p>
         </div>
         <div v-else class="grid grid-cols-3 sm:grid-cols-4 gap-3">
           <BookCard v-for="b in books" :key="b.id" :book="b" :show-format="false" :show-meta="false" @open="readBook" />

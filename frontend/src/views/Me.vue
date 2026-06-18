@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { listMyAchievements, listAllAchievements, listMyFavorites, listMyBooks, getMyReadingSummary, getUserProfile, uploadAvatar } from '@/lib/books'
-import { BookOpen, Star, BarChart3, Trophy, UserRound, IdCard, Flame, LogOut, Upload, ChevronRight } from 'lucide-vue-next'
+import { BookOpen, Star, BarChart3, Trophy, UserRound, IdCard, Flame, LogOut, Upload, ChevronRight, Sparkles } from 'lucide-vue-next'
+import UserAvatar from '@/components/UserAvatar.vue'
+import NicknamePrompt from '@/components/NicknamePrompt.vue'
+import { isEmailLikeUsername, maskEmail } from '@/lib/privacy'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -18,6 +21,11 @@ const loadError = ref('')
 const myProfile = ref<any>(null)
 const uploadingAvatar = ref(false)
 const avatarInput = ref<HTMLInputElement | null>(null)
+const showNicknamePrompt = ref(false)
+
+const needsNickname = computed(() =>
+  isEmailLikeUsername(myProfile.value?.username, auth.user?.email)
+)
 
 async function refresh() {
   if (!auth.isLoggedIn) return
@@ -76,6 +84,10 @@ async function onAvatarChange(e: Event) {
   }
 }
 
+function onNicknameUpdated(name: string) {
+  myProfile.value = { ...(myProfile.value || {}), username: name }
+}
+
 function fmtTime(sec: number) {
   const h = Math.floor(sec / 3600)
   const m = Math.floor((sec % 3600) / 60)
@@ -96,15 +108,14 @@ function openMyProfile() {
 <template>
   <div class="max-w-3xl mx-auto px-4 py-4">
     <!-- 头部 -->
-    <div class="card p-5 mb-3 bg-gradient-to-br from-brand-400 via-brand-500 to-brand-700 text-white relative overflow-hidden">
+    <div class="card p-5 mb-3 bg-gradient-to-br from-neon-purple via-fuchsia-600 to-neon-pink text-white relative overflow-hidden">
       <div class="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
       <div class="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
       <div class="flex items-center gap-3 relative">
         <div class="relative group w-16 h-16">
-          <div class="w-16 h-16 rounded-full bg-white/20 overflow-hidden flex items-center justify-center text-2xl font-bold cursor-pointer ring-4 ring-white/30 shadow-md"
+          <div class="w-16 h-16 rounded-full overflow-hidden cursor-pointer ring-4 ring-white/30 shadow-md relative"
                @click="openMyProfile">
-            <img v-if="myProfile?.avatar_url" :src="myProfile.avatar_url" class="w-full h-full object-cover" alt="avatar" />
-            <span v-else>{{ (auth.user?.email || '?')[0].toUpperCase() }}</span>
+            <UserAvatar :user="myProfile" size="lg" />
           </div>
           <label class="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-[10px] opacity-0 group-hover:opacity-100 cursor-pointer rounded-full transition-opacity">
             <Upload class="w-3.5 h-3.5 mr-0.5" :stroke-width="1.75" />
@@ -121,11 +132,11 @@ function openMyProfile() {
         </div>
         <div class="flex-1 min-w-0">
           <div class="font-bold text-lg truncate" @click="openMyProfile">
-            {{ myProfile?.username || auth.user?.email?.split('@')[0] }}
+            {{ myProfile?.username || '未设置昵称' }}
           </div>
-          <div class="text-xs text-white/70 truncate">{{ auth.user?.email }}</div>
+          <div class="text-xs text-white/70 truncate">{{ maskEmail(auth.user?.email) }}</div>
         </div>
-        <button v-if="!auth.isLoggedIn" @click="router.push('/login')" class="bg-white text-brand-600 px-3 py-1.5 rounded-lg text-sm font-medium">
+        <button v-if="!auth.isLoggedIn" @click="router.push('/login')" class="bg-ink-50 text-neon-purple px-3 py-1.5 rounded-lg text-sm font-medium">
           登录
         </button>
         <button v-else @click="handleLogout" class="text-white/80 text-sm hover:text-white flex items-center gap-1">
@@ -134,8 +145,22 @@ function openMyProfile() {
         </button>
       </div>
 
+      <!-- 昵称引导条 -->
+      <div
+        v-if="auth.isLoggedIn && needsNickname"
+        class="mt-4 flex items-center gap-2 px-3 py-2 rounded-xl
+               bg-amber-400/20 border border-amber-300/40 backdrop-blur-sm text-amber-50 text-sm"
+      >
+        <Sparkles class="w-4 h-4 text-amber-200 flex-shrink-0" :stroke-width="1.75" />
+        <span class="flex-1">设置一个昵称，让社区认识你</span>
+        <button
+          @click="showNicknamePrompt = true"
+          class="px-2.5 py-1 rounded-lg bg-amber-300 text-amber-900 text-xs font-medium hover:bg-amber-300"
+        >设置</button>
+      </div>
+
       <!-- 统计小卡 -->
-      <div class="grid grid-cols-4 gap-2 mt-5 text-center relative">
+      <div class="grid grid-cols-4 gap-2 mt-4 text-center relative">
         <div class="rounded-xl bg-white/15 backdrop-blur-sm py-2.5">
           <div class="text-xl font-bold">{{ bookCount }}</div>
           <div class="text-xs text-white/70">藏书</div>
@@ -160,50 +185,50 @@ function openMyProfile() {
 
     <!-- 菜单列表 -->
     <div v-if="auth.isLoggedIn" class="space-y-2">
-      <div v-if="loadError" class="card p-4 text-center text-rose-500 text-sm">{{ loadError }}</div>
-      <div class="card divide-y divide-slate-100">
-        <button @click="router.push('/library')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition">
-          <span class="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
+      <div v-if="loadError" class="card p-4 text-center text-rose-400 text-sm">{{ loadError }}</div>
+      <div class="card divide-y divide-neon-purple/15">
+        <button @click="router.push('/library')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-900 active:bg-ink-800/60 transition">
+          <span class="w-9 h-9 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
             <BookOpen class="w-5 h-5" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">我的书架</span>
-          <ChevronRight class="w-4 h-4 text-slate-400" :stroke-width="1.75" />
+          <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="router.push('/favorites')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition">
-          <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+        <button @click="router.push('/favorites')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-900 active:bg-ink-800/60 transition">
+          <span class="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center flex-shrink-0">
             <Star class="w-5 h-5" :fill="'currentColor'" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">我的收藏</span>
-          <ChevronRight class="w-4 h-4 text-slate-400" :stroke-width="1.75" />
+          <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="router.push('/stats')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition">
-          <span class="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center flex-shrink-0">
+        <button @click="router.push('/stats')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-900 active:bg-ink-800/60 transition">
+          <span class="w-9 h-9 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
             <BarChart3 class="w-5 h-5" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">阅读统计</span>
-          <ChevronRight class="w-4 h-4 text-slate-400" :stroke-width="1.75" />
+          <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="router.push('/achievements')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition">
-          <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+        <button @click="router.push('/achievements')" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-900 active:bg-ink-800/60 transition">
+          <span class="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center flex-shrink-0">
             <Trophy class="w-5 h-5" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">我的成就</span>
-          <span class="text-xs text-slate-500">{{ achievements.length }}/{{ allAch.length }}</span>
-          <ChevronRight class="w-4 h-4 text-slate-400" :stroke-width="1.75" />
+          <span class="text-xs text-ink-300">{{ achievements.length }}/{{ allAch.length }}</span>
+          <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="router.push(`/follows/following/${auth.user?.id}`)" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition">
-          <span class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+        <button @click="router.push(`/follows/following/${auth.user?.id}`)" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-900 active:bg-ink-800/60 transition">
+          <span class="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-300 flex items-center justify-center flex-shrink-0">
             <UserRound class="w-5 h-5" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">我的关注</span>
-          <ChevronRight class="w-4 h-4 text-slate-400" :stroke-width="1.75" />
+          <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
-        <button @click="openMyProfile" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition">
-          <span class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
+        <button @click="openMyProfile" class="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-ink-900 active:bg-ink-800/60 transition">
+          <span class="w-9 h-9 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
             <IdCard class="w-5 h-5" :stroke-width="1.75" />
           </span>
           <span class="flex-1 text-left">个人主页</span>
-          <ChevronRight class="w-4 h-4 text-slate-400" :stroke-width="1.75" />
+          <ChevronRight class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
         </button>
       </div>
 
@@ -211,9 +236,9 @@ function openMyProfile() {
       <div class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold text-sm">最近成就</h3>
-          <button @click="router.push('/achievements')" class="text-xs text-brand-600 hover:underline">全部 ›</button>
+          <button @click="router.push('/achievements')" class="text-xs text-neon-purple hover:underline">全部 ›</button>
         </div>
-        <div v-if="achievements.length === 0" class="text-xs text-slate-400 py-4 text-center">
+        <div v-if="achievements.length === 0" class="text-xs text-ink-300 py-4 text-center">
           还没解锁成就，上传一本书试试
         </div>
         <div v-else class="grid grid-cols-4 gap-3">
@@ -222,24 +247,26 @@ function openMyProfile() {
             :key="a.achievement_id"
             class="text-center"
           >
-            <div class="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center ring-2 ring-white shadow-sm">
+            <div class="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-amber-500/25 to-amber-400/15 flex items-center justify-center ring-2 ring-white/15 shadow-sm">
               <span v-if="a.achievements?.icon" class="text-2xl">{{ a.achievements.icon }}</span>
-              <Trophy v-else class="w-6 h-6 text-amber-500" :stroke-width="2" />
+              <Trophy v-else class="w-6 h-6 text-amber-300" :stroke-width="2" />
             </div>
             <div class="text-xs mt-1.5 line-clamp-1">{{ a.achievements?.name }}</div>
           </div>
         </div>
       </div>
 
-      <div class="text-center text-xs text-slate-400 py-4">
+      <div class="text-center text-xs text-ink-300 py-4">
         累计阅读 {{ fmtTime(totalSeconds) }}
       </div>
     </div>
 
     <div v-else class="text-center py-16">
-      <BookOpen class="w-16 h-16 mx-auto text-slate-300 mb-3" :stroke-width="1.5" />
-      <p class="text-slate-500 mb-4">登录后查看更多</p>
+      <BookOpen class="w-16 h-16 mx-auto text-ink-300 mb-3" :stroke-width="1.5" />
+      <p class="text-ink-300 mb-4">登录后查看更多</p>
       <button @click="router.push('/login')" class="btn-primary">立即登录</button>
     </div>
+
+    <NicknamePrompt :open="showNicknamePrompt" @close="showNicknamePrompt = false" @updated="onNicknameUpdated" />
   </div>
 </template>

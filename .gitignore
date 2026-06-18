@@ -24,3 +24,8 @@ npm-debug.log*
 # supabase local
 supabase/.branches
 supabase/.temp
+supabase/supabase/
+
+# supabase CLI binaries (use `npx supabase` or download separately)
+supabase.exe
+supabase-go.exe

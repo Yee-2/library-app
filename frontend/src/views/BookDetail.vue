@@ -8,6 +8,7 @@ import {
 } from '@/lib/books'
 import { formatDate } from '@/lib/utils'
 import { ArrowLeft, BookOpen, Download, Star, User, Hash, Type, FileText } from 'lucide-vue-next'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -113,31 +114,31 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
       </button>
     </div>
 
-    <div v-if="loading" class="text-center text-slate-500 py-8">加载中…</div>
+    <div v-if="loading" class="text-center text-ink-300 py-8">加载中…</div>
 
     <div v-else-if="book">
       <!-- 头部 -->
       <div class="card p-5 mb-4 flex gap-5">
-        <div class="w-32 sm:w-36 flex-shrink-0 aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-lg">
+        <div class="w-32 sm:w-36 flex-shrink-0 aspect-[3/4] bg-ink-800/60 rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-lg">
           <img v-if="book.cover_url" :src="book.cover_url" class="w-full h-full object-cover" :alt="book.title" />
           <div v-else class="w-full h-full flex items-center justify-center">
-            <BookOpen class="w-12 h-12 text-slate-300" :stroke-width="1.5" />
+            <BookOpen class="w-12 h-12 text-ink-300" :stroke-width="1.5" />
           </div>
         </div>
         <div class="flex-1 min-w-0">
           <h1 class="text-xl font-bold line-clamp-2 tracking-tight">{{ book.title }}</h1>
-          <p class="text-sm text-slate-500 mt-1">{{ book.author || '佚名' }}</p>
-          <div class="flex items-center gap-2 mt-2 text-xs text-slate-400">
-            <span class="px-1.5 py-0.5 rounded bg-slate-100 font-mono uppercase">{{ book.file_format }}</span>
+          <p class="text-sm text-ink-300 mt-1">{{ book.author || '佚名' }}</p>
+          <div class="flex items-center gap-2 mt-2 text-xs text-ink-300">
+            <span class="px-1.5 py-0.5 rounded bg-ink-800/60 font-mono uppercase">{{ book.file_format }}</span>
             <span>{{ (book.file_size / 1024 / 1024).toFixed(2) }} MB</span>
             <span>↓ {{ book.download_count }} 次</span>
           </div>
           <div class="flex items-center gap-1.5 mt-2.5 text-sm">
-            <Star class="w-4 h-4 text-amber-500" :fill="'currentColor'" :stroke-width="1" />
+            <Star class="w-4 h-4 text-amber-300" :fill="'currentColor'" :stroke-width="1" />
             <span class="font-semibold">{{ avgRating }}</span>
-            <span class="text-slate-400 text-xs">· {{ reviews.length }} 评</span>
+            <span class="text-ink-300 text-xs">· {{ reviews.length }} 评</span>
           </div>
-          <p v-if="book.description" class="text-sm text-slate-600 mt-3 line-clamp-4 leading-relaxed">{{ book.description }}</p>
+          <p v-if="book.description" class="text-sm text-ink-200 mt-3 line-clamp-4 leading-relaxed">{{ book.description }}</p>
         </div>
       </div>
 
@@ -161,36 +162,33 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
       </div>
 
       <!-- 分享者 -->
-      <div class="card p-3 mb-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition"
+      <div class="card p-3 mb-4 flex items-center gap-3 cursor-pointer hover:shadow-[0_0_24px_rgba(168,85,247,0.3)] hover:border-neon-purple/40 transition"
            @click="book.profiles?.username && router.push(`/user/${book.user_id}`)">
-        <div class="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0">
-          <img v-if="book.profiles?.avatar_url" :src="book.profiles.avatar_url" class="w-full h-full object-cover" alt="avatar" />
-          <span v-else>{{ (book.profiles?.username || '?')[0].toUpperCase() }}</span>
-        </div>
+        <UserAvatar :user="book.profiles" size="sm" />
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium">{{ book.profiles?.username || '匿名' }}</div>
-          <div class="text-xs text-slate-400">分享于 {{ formatDate(book.created_at) }}</div>
+          <div class="text-xs text-ink-300">分享于 {{ formatDate(book.created_at) }}</div>
         </div>
-        <span class="text-xs text-slate-400">查看主页 ›</span>
+        <span class="text-xs text-ink-300">查看主页 ›</span>
       </div>
 
       <!-- 书评 -->
       <div class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold tracking-tight">书评 ({{ reviews.length }})</h3>
-          <button v-if="auth.isLoggedIn" @click="showReview = !showReview" class="text-sm text-brand-600 hover:underline">
+          <button v-if="auth.isLoggedIn" @click="showReview = !showReview" class="text-sm text-neon-purple hover:underline">
             {{ showReview ? '取消' : '写书评' }}
           </button>
         </div>
 
-        <div v-if="showReview" class="bg-slate-50 rounded-xl p-3 mb-3 space-y-2">
+        <div v-if="showReview" class="bg-ink-900 rounded-xl p-3 mb-3 space-y-2">
           <div class="flex items-center gap-1">
-            <span class="text-xs text-slate-500 mr-2">评分</span>
+            <span class="text-xs text-ink-300 mr-2">评分</span>
             <button v-for="n in 5" :key="n" @click="rRating = n" class="p-0.5 transition-transform hover:scale-110">
               <Star class="w-5 h-5" :fill="n <= rRating ? 'currentColor' : 'none'"
-                    :class="n <= rRating ? 'text-amber-500' : 'text-slate-300'" :stroke-width="1.5" />
+                    :class="n <= rRating ? 'text-amber-300' : 'text-ink-300'" :stroke-width="1.5" />
             </button>
-            <span class="text-xs text-slate-500 ml-1">{{ rRating }} 星</span>
+            <span class="text-xs text-ink-300 ml-1">{{ rRating }} 星</span>
           </div>
           <textarea v-model="rContent" rows="3" placeholder="说说你的看法…" class="input"></textarea>
           <div class="flex justify-end gap-2">
@@ -200,25 +198,22 @@ const isOwner = computed(() => auth.user?.id === book.value?.user_id)
         </div>
 
         <div v-if="reviews.length === 0" class="text-center py-8">
-          <FileText class="w-10 h-10 mx-auto text-slate-300 mb-2" :stroke-width="1.5" />
-          <p class="text-slate-400 text-sm">还没有书评</p>
+          <FileText class="w-10 h-10 mx-auto text-ink-300 mb-2" :stroke-width="1.5" />
+          <p class="text-ink-300 text-sm">还没有书评</p>
         </div>
         <div v-else class="space-y-3">
-          <div v-for="r in reviews" :key="r.id" class="border-b border-slate-100 last:border-0 pb-3 last:pb-0">
+          <div v-for="r in reviews" :key="r.id" class="border-b border-neon-purple/15 last:border-0 pb-3 last:pb-0">
             <div class="flex items-center gap-2">
-              <div class="w-7 h-7 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center text-xs flex-shrink-0">
-                <img v-if="r.profiles?.avatar_url" :src="r.profiles.avatar_url" class="w-full h-full object-cover" alt="avatar" />
-                <span v-else>{{ (r.profiles?.username || '?')[0].toUpperCase() }}</span>
-              </div>
+              <UserAvatar :user="r.profiles" size="xs" />
               <span class="text-sm font-medium">{{ r.profiles?.username || '匿名' }}</span>
               <div class="flex">
                 <Star v-for="n in 5" :key="n" class="w-3.5 h-3.5"
                       :fill="n <= r.rating ? 'currentColor' : 'none'"
-                      :class="n <= r.rating ? 'text-amber-500' : 'text-slate-200'" :stroke-width="1" />
+                      :class="n <= r.rating ? 'text-amber-300' : 'text-ink-200'" :stroke-width="1" />
               </div>
-              <span class="text-xs text-slate-400 ml-auto">{{ formatDate(r.created_at) }}</span>
+              <span class="text-xs text-ink-300 ml-auto">{{ formatDate(r.created_at) }}</span>
             </div>
-            <p v-if="r.content" class="text-sm text-slate-600 mt-1.5 ml-9 leading-relaxed">{{ r.content }}</p>
+            <p v-if="r.content" class="text-sm text-ink-200 mt-1.5 ml-9 leading-relaxed">{{ r.content }}</p>
           </div>
         </div>
       </div>

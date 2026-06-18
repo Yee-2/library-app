@@ -5,7 +5,8 @@ import {
   listFollowers, listFollowing
 } from '@/lib/books'
 import { useAuthStore } from '@/stores/auth'
-import { ArrowLeft, User as UserIcon, Users, UserPlus } from 'lucide-vue-next'
+import { ArrowLeft, Users, UserPlus } from 'lucide-vue-next'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,26 +43,23 @@ function open(id: string) { router.push(`/user/${id}`) }
         <ArrowLeft class="w-4 h-4" :stroke-width="1.75" />
         <span>返回</span>
       </button>
-      <h1 class="text-2xl font-bold tracking-tight">{{ type === 'followers' ? '粉丝' : '关注' }}</h1>
+      <h1 class="text-2xl font-bold tracking-tight text-ink-50">{{ type === 'followers' ? '粉丝' : '关注' }}</h1>
     </div>
-    <div v-if="loading" class="text-center text-slate-500 py-8">加载中…</div>
+    <div v-if="loading" class="text-center text-ink-300 py-8">加载中…</div>
     <div v-else-if="list.length === 0" class="text-center py-16">
-      <component :is="type === 'followers' ? Users : UserPlus" class="w-12 h-12 mx-auto text-slate-300 mb-2" :stroke-width="1.5" />
-      <p class="text-slate-500">还没有人</p>
+      <component :is="type === 'followers' ? Users : UserPlus" class="w-12 h-12 mx-auto text-ink-300 mb-2" :stroke-width="1.5" />
+      <p class="text-ink-300">还没有人</p>
     </div>
     <div v-else class="space-y-2">
       <div v-for="item in list" :key="item.follower_id || item.followee_id"
-           class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition"
+           class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-[0_0_24px_rgba(168,85,247,0.3)] hover:border-neon-purple/40 transition"
            @click="open(item.follower_id || item.followee_id)">
-        <div class="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center font-medium flex-shrink-0">
-          <img v-if="(item.profiles as any)?.avatar_url" :src="(item.profiles as any).avatar_url" class="w-full h-full object-cover" alt="avatar" />
-          <UserIcon v-else class="w-5 h-5" :stroke-width="1.75" />
-        </div>
+        <UserAvatar :user="item.profiles as any" size="md" />
         <div class="flex-1 min-w-0">
-          <div class="font-medium text-sm">{{ (item.profiles as any)?.username || '匿名' }}</div>
-          <div class="text-xs text-slate-400">关注于 {{ new Date(item.created_at).toLocaleDateString('zh-CN') }}</div>
+          <div class="font-medium text-sm text-ink-50">{{ (item.profiles as any)?.username || '匿名' }}</div>
+          <div class="text-xs text-ink-300">关注于 {{ new Date(item.created_at).toLocaleDateString('zh-CN') }}</div>
         </div>
-        <span class="text-xs text-brand-600">查看 ›</span>
+        <span class="text-xs text-neon-purple">查看 ›</span>
       </div>
     </div>
   </div>
