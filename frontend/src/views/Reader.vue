@@ -728,7 +728,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 <template>
   <div class="h-screen flex flex-col overflow-hidden">
     <!-- 顶部工具栏 -->
-    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
+    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-neon-purple/20">
       <div class="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between gap-2">
         <RouterLink to="/library" class="btn-ghost -ml-2 flex items-center gap-1 text-sm">
           <ArrowLeft class="w-4 h-4" :stroke-width="1.75" />
@@ -755,13 +755,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </button>
         </div>
       </div>
-      <div class="h-0.5 bg-slate-100">
-        <div class="h-full bg-brand-500 transition-all" :style="{ width: progressPct + '%' }"></div>
+      <div class="h-0.5 bg-ink-800/60">
+        <div class="h-full bg-neon-purple/150 transition-all" :style="{ width: progressPct + '%' }"></div>
       </div>
     </header>
 
     <!-- 阅读区 -->
-    <div v-if="loading" class="flex-1 flex items-center justify-center text-slate-500">加载中…</div>
+    <div v-if="loading" class="flex-1 flex items-center justify-center text-ink-300">加载中…</div>
     <div v-else-if="error" class="flex-1 flex items-center justify-center text-red-500">{{ error }}</div>
     <div v-else
       :class="['flex-1 reader-scroller', book?.file_format !== 'epub' ? 'reader-scroller-paged' : '']"
@@ -782,7 +782,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <!-- 底部翻页 -->
     <footer
       v-if="!loading && !error && book"
-      class="sticky bottom-0 bg-white/95 backdrop-blur border-t border-slate-200 py-2"
+      class="sticky bottom-0 bg-ink-850/95 backdrop-blur border-t border-neon-purple/20 py-2"
     >
       <div class="max-w-4xl mx-auto px-4 flex items-center justify-between text-sm">
         <button
@@ -790,7 +790,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           :disabled="book.file_format === 'epub' && !epubRendition"
           class="btn-secondary"
         >上一页</button>
-        <span class="text-slate-500">
+        <span class="text-ink-300">
           <!-- 快速跳转页码 -->
           <span class="cursor-pointer" @click="pageInputVisible = true" v-if="!pageInputVisible">
             <template v-if="book.file_format === 'epub'">
@@ -827,25 +827,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] overflow-auto">
         <div class="flex justify-between items-center mb-4">
           <h3 class="font-semibold">阅读设置</h3>
-          <button @click="showSettings = false" class="text-slate-400"><X class="w-5 h-5" :stroke-width="1.75" /></button>
+          <button @click="showSettings = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
         </div>
 
         <section class="mb-4">
-          <h4 class="text-xs text-slate-500 mb-2">字体</h4>
+          <h4 class="text-xs text-ink-300 mb-2">字体</h4>
           <div class="grid grid-cols-2 gap-2">
             <button
               v-for="f in FONT_OPTIONS"
               :key="f.id"
               @click="reader.setFont(f.id)"
               :class="['px-3 py-2 rounded border text-sm',
-                       reader.fontId === f.id ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200']"
+                       reader.fontId === f.id ? 'border-brand-500 bg-neon-purple/15 text-neon-purple' : 'border-neon-purple/20']"
               :style="{ fontFamily: f.family }"
             >{{ f.preview }}</button>
           </div>
         </section>
 
         <section class="mb-4">
-          <h4 class="text-xs text-slate-500 mb-2">字号</h4>
+          <h4 class="text-xs text-ink-300 mb-2">字号</h4>
           <div class="flex items-center gap-2">
             <button @click="reader.zoom(-2)" class="btn-secondary px-3">A-</button>
             <div class="flex-1 text-center text-sm">{{ reader.fontSize }}px</div>
@@ -854,21 +854,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         </section>
 
         <section class="mb-4">
-          <h4 class="text-xs text-slate-500 mb-2">行间距</h4>
+          <h4 class="text-xs text-ink-300 mb-2">行间距</h4>
           <input type="range" min="1.2" max="2.4" step="0.1" :value="reader.lineHeight"
                  @input="(e) => reader.setLineHeight(+(e.target as HTMLInputElement).value)" class="w-full" />
-          <div class="text-xs text-slate-400 text-center">{{ reader.lineHeight }}</div>
+          <div class="text-xs text-ink-300 text-center">{{ reader.lineHeight }}</div>
         </section>
 
         <section class="mb-4">
-          <h4 class="text-xs text-slate-500 mb-2">页面宽度</h4>
+          <h4 class="text-xs text-ink-300 mb-2">页面宽度</h4>
           <input type="range" min="480" max="960" step="40" :value="reader.maxWidth"
                  @input="(e) => reader.setMaxWidth(+(e.target as HTMLInputElement).value)" class="w-full" />
-          <div class="text-xs text-slate-400 text-center">{{ reader.maxWidth }}px</div>
+          <div class="text-xs text-ink-300 text-center">{{ reader.maxWidth }}px</div>
         </section>
 
         <section>
-          <h4 class="text-xs text-slate-500 mb-2">主题</h4>
+          <h4 class="text-xs text-ink-300 mb-2">主题</h4>
           <div class="grid grid-cols-4 gap-2">
             <button
               v-for="t in THEME_OPTIONS"
@@ -889,19 +889,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">书签 ({{ bookmarks.length }})</h3>
           <div class="flex items-center gap-2">
-            <button @click="addCurrentBookmark" class="text-brand-600 text-sm">+ 添加当前页</button>
-            <button @click="showBookmarks = false" class="text-slate-400"><X class="w-5 h-5" :stroke-width="1.75" /></button>
+            <button @click="addCurrentBookmark" class="text-neon-purple text-sm">+ 添加当前页</button>
+            <button @click="showBookmarks = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
           </div>
         </div>
         <div class="flex-1 overflow-auto space-y-2">
-          <div v-if="bookmarks.length === 0" class="text-center text-slate-400 py-8 text-sm">暂无书签</div>
+          <div v-if="bookmarks.length === 0" class="text-center text-ink-300 py-8 text-sm">暂无书签</div>
           <div v-for="b in bookmarks" :key="b.id" class="card p-3 flex items-center gap-2">
             <div class="w-1 self-stretch rounded" :style="{ background: b.color }"></div>
             <div class="flex-1 min-w-0">
               <div class="text-sm">{{ b.note || `第 ${b.page} 页` }}</div>
-              <div class="text-xs text-slate-400">{{ new Date(b.created_at).toLocaleString('zh-CN') }}</div>
+              <div class="text-xs text-ink-300">{{ new Date(b.created_at).toLocaleString('zh-CN') }}</div>
             </div>
-            <button @click="gotoBookmark(b)" class="text-brand-600 text-sm">跳转</button>
+            <button @click="gotoBookmark(b)" class="text-neon-purple text-sm">跳转</button>
             <button @click="removeBookmark(b.id)" class="text-red-500 text-sm">删</button>
           </div>
         </div>
@@ -913,19 +913,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] flex flex-col">
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">笔记 ({{ notes.length }})</h3>
-          <button @click="showNotes = false" class="text-slate-400"><X class="w-5 h-5" :stroke-width="1.75" /></button>
+          <button @click="showNotes = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
         </div>
         <div class="mb-3 flex gap-2">
           <input v-model="newNoteText" placeholder="添加新笔记…" class="input" @keydown.enter="addNoteManual" />
           <button @click="addNoteManual" class="btn-primary">添加</button>
         </div>
         <div class="flex-1 overflow-auto space-y-2">
-          <div v-if="notes.length === 0" class="text-center text-slate-400 py-6 text-sm">暂无笔记</div>
+          <div v-if="notes.length === 0" class="text-center text-ink-300 py-6 text-sm">暂无笔记</div>
           <div v-for="n in notes" :key="n.id" class="card p-3">
             <div class="text-sm whitespace-pre-wrap">{{ n.content }}</div>
-            <div v-if="n.comment" class="text-xs text-slate-500 mt-1">批注：{{ n.comment }}</div>
+            <div v-if="n.comment" class="text-xs text-ink-300 mt-1">批注：{{ n.comment }}</div>
             <div class="flex justify-between items-center mt-2">
-              <span class="text-xs text-slate-400">
+              <span class="text-xs text-ink-300">
                 {{ n.page ? `第 ${n.page} 页` : '当前位置' }} · {{ new Date(n.created_at).toLocaleString('zh-CN') }}
               </span>
               <button @click="removeNote(n.id)" class="text-red-500 text-xs">删</button>
@@ -940,32 +940,32 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5">
         <div class="flex justify-between items-center mb-4">
           <h3 class="font-semibold">AI 听书</h3>
-          <button @click="showTTS = false; stopTTS()" class="text-slate-400"><X class="w-5 h-5" :stroke-width="1.75" /></button>
+          <button @click="showTTS = false; stopTTS()" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
         </div>
 
         <section class="mb-4">
-          <h4 class="text-xs text-slate-500 mb-2">音色</h4>
+          <h4 class="text-xs text-ink-300 mb-2">音色</h4>
           <div class="grid grid-cols-2 gap-2">
             <button
               v-for="v in TTS_VOICES"
               :key="v.id"
               @click="ttsVoice = v.id; stopTTS(); startTTS()"
               :class="['px-3 py-2 rounded border text-sm text-left',
-                       ttsVoice === v.id ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200']"
+                       ttsVoice === v.id ? 'border-brand-500 bg-neon-purple/15 text-neon-purple' : 'border-neon-purple/20']"
             >{{ v.name }}</button>
           </div>
         </section>
 
         <section class="mb-4">
-          <h4 class="text-xs text-slate-500 mb-2">语速 ({{ ttsSpeed.toFixed(1) }}x)</h4>
+          <h4 class="text-xs text-ink-300 mb-2">语速 ({{ ttsSpeed.toFixed(1) }}x)</h4>
           <input type="range" min="0.5" max="2.0" step="0.1" v-model.number="ttsSpeed" class="w-full"
                  @change="stopTTS(); startTTS()" />
         </section>
 
-        <div v-if="ttsPlaying" class="text-xs text-slate-500 mb-3">
+        <div v-if="ttsPlaying" class="text-xs text-ink-300 mb-3">
           正在播放 {{ ttsIndex + 1 }} / {{ ttsQueue.length }} 句
-          <div class="h-1 bg-slate-100 rounded mt-1">
-            <div class="h-full bg-brand-500 rounded transition-all"
+          <div class="h-1 bg-ink-800/60 rounded mt-1">
+            <div class="h-full bg-neon-purple/150 rounded transition-all"
                  :style="{ width: ((ttsIndex + 1) / ttsQueue.length * 100) + '%' }"></div>
           </div>
         </div>
@@ -988,7 +988,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             <span>重新播放</span>
           </button>
         </div>
-        <p class="text-xs text-slate-400 mt-3">由 MiniMax M3 TTS 提供支持</p>
+        <p class="text-xs text-ink-300 mt-3">由 MiniMax M3 TTS 提供支持</p>
       </div>
     </div>
 
@@ -997,13 +997,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] flex flex-col">
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">目录 ({{ chapters.length }})</h3>
-          <button @click="showToc = false" class="text-slate-400"><X class="w-5 h-5" :stroke-width="1.75" /></button>
+          <button @click="showToc = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
         </div>
-        <div v-if="chapters.length === 0" class="text-center text-slate-400 py-6 text-sm">暂无目录</div>
+        <div v-if="chapters.length === 0" class="text-center text-ink-300 py-6 text-sm">暂无目录</div>
         <div class="flex-1 overflow-auto space-y-1">
           <div v-for="(ch, i) in chapters" :key="ch.id || i"
                @click="book?.file_format === 'epub' ? gotoEpubChapter(ch) : jumpToChapter(ch.index!)"
-               class="card p-3 cursor-pointer hover:bg-slate-50 transition text-sm"
+               class="card p-3 cursor-pointer hover:bg-ink-900 transition text-sm"
                :title="ch.label">
             <div class="truncate">{{ i + 1 }}. {{ ch.label }}</div>
           </div>

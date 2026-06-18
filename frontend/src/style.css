@@ -11,13 +11,16 @@ html, body, #app {
 
 body {
   font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: #f8fafc;
+  background: linear-gradient(135deg, #0f0820 0%, #1a0f33 50%, #27164a 100%);
+  background-attachment: fixed;
+  color: #f5f3ff;
+  min-height: 100vh;
 }
 
-/* 滚动条 */
+/* 滚动条（暗色） */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(168,85,247,0.6); }
 ::-webkit-scrollbar-track { background: transparent; }
 
 /* 阅读器样式变量（由 JS 动态注入） */
@@ -91,32 +94,76 @@ body {
   padding: 0 2px;
 }
 
-/* 路由过渡 */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
+/* 路由过渡 - fade-slide */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s;
+}
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
-/* 按钮统一基类 */
+.fade-slide-enter-active, .fade-slide-leave-active {
+  transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fade-slide-enter-from { opacity: 0; transform: translateY(8px); }
+.fade-slide-leave-to   { opacity: 0; transform: translateY(-8px); }
+
+/* 列表错落入场 */
+.stagger-enter-active { transition: all 350ms cubic-bezier(0.16, 1, 0.3, 1); }
+.stagger-leave-active { transition: all 200ms ease; }
+.stagger-enter-from   { opacity: 0; transform: translateY(12px); }
+.stagger-leave-to     { opacity: 0; transform: translateY(-8px); }
+.stagger-enter-active:nth-child(1) { transition-delay: 0ms; }
+.stagger-enter-active:nth-child(2) { transition-delay: 40ms; }
+.stagger-enter-active:nth-child(3) { transition-delay: 80ms; }
+.stagger-enter-active:nth-child(4) { transition-delay: 120ms; }
+.stagger-enter-active:nth-child(5) { transition-delay: 160ms; }
+.stagger-enter-active:nth-child(6) { transition-delay: 200ms; }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 按钮 / 输入 / 卡片 - 暗色霓虹基类 */
 @layer components {
   .btn { @apply inline-flex items-center justify-center gap-1.5 px-4 h-10 rounded-xl text-sm font-medium
          transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
          select-none whitespace-nowrap; }
-  .btn-primary   { @apply btn bg-brand-500 text-white shadow-sm hover:bg-brand-600 hover:shadow; }
-  .btn-secondary { @apply btn bg-slate-100 text-slate-700 hover:bg-slate-200; }
-  .btn-ghost     { @apply btn text-slate-600 hover:bg-slate-100; }
-  .btn-danger    { @apply btn bg-rose-500 text-white shadow-sm hover:bg-rose-600; }
+  .btn-primary   { @apply btn bg-gradient-to-r from-neon-purple to-neon-pink text-white shadow-lg
+                   hover:shadow-[0_0_24px_rgba(168,85,247,0.55)]; }
+  .btn-secondary { @apply btn bg-ink-800/60 text-ink-100 border border-neon-purple/20
+                   hover:bg-ink-800 hover:border-neon-purple/40; }
+  .btn-ghost     { @apply btn text-ink-200 hover:bg-neon-purple/10 hover:text-ink-50; }
+  .btn-danger    { @apply btn bg-rose-500 text-white shadow-sm hover:bg-rose-400; }
   .btn-icon      { @apply btn p-0 w-10 h-10 rounded-xl; }
 
-  .input { @apply w-full px-3.5 h-10 rounded-xl border border-slate-200 bg-white
-          focus:outline-none focus:ring-2 focus:ring-brand-400/40 focus:border-brand-400
-          placeholder:text-slate-400 text-sm transition; }
+  .input { @apply w-full px-3.5 h-10 rounded-xl bg-ink-800/60 border border-neon-purple/20
+          text-ink-50 placeholder:text-ink-300 focus:outline-none focus:ring-2
+          focus:ring-neon-purple/40 focus:border-neon-purple/60 transition; }
 
-  .card { @apply bg-white rounded-2xl shadow-sm border border-slate-100 transition; }
-  .card-hover { @apply card hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200; }
+  .card { @apply rounded-2xl transition; background: rgba(39,22,74,0.55); backdrop-filter: blur(12px);
+          border: 1px solid rgba(168,85,247,0.15); }
+  .card-hover { @apply card hover:shadow-[0_0_28px_rgba(168,85,247,0.35)]
+                hover:border-neon-purple/40 hover:-translate-y-0.5 transition-all duration-200; }
+
+  /* 玻璃面板 */
+  .glass-panel {
+    background: rgba(39, 22, 74, 0.55);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(168, 85, 247, 0.18);
+  }
+
+  /* 霓虹辉光 */
+  .neon-glow-purple { box-shadow: 0 0 20px rgba(168,85,247,0.4), 0 0 40px rgba(168,85,247,0.15); }
+  .neon-glow-pink   { box-shadow: 0 0 20px rgba(236,72,153,0.4), 0 0 40px rgba(236,72,153,0.15); }
+  .neon-text-purple { text-shadow: 0 0 12px rgba(168,85,247,0.7); }
+  .neon-text-pink   { text-shadow: 0 0 12px rgba(236,72,153,0.7); }
+  .neon-border      { border: 1px solid rgba(168,85,247,0.3); }
 }
 
 /* 加载骨架屏 */
 .skeleton {
-  background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%);
+  background: linear-gradient(90deg, rgba(139,92,246,0.08) 0%, rgba(168,85,247,0.2) 50%, rgba(139,92,246,0.08) 100%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
   border-radius: 0.75rem;
@@ -126,16 +173,21 @@ body {
   100% { background-position: -200% 0; }
 }
 
-/* 标签徽章 */
+/* 标签徽章（暗色） */
 .badge {
   @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
 }
-.badge-brand { @apply badge bg-brand-50 text-brand-700; }
-.badge-gray { @apply badge bg-slate-100 text-slate-600; }
-.badge-green { @apply badge bg-emerald-50 text-emerald-700; }
-.badge-amber { @apply badge bg-amber-50 text-amber-700; }
+.badge-brand  { @apply badge bg-neon-purple/15 text-neon-purple border border-neon-purple/25; }
+.badge-gray   { @apply badge bg-ink-800/60 text-ink-200; }
+.badge-green  { @apply badge bg-emerald-500/15 text-emerald-300 border border-emerald-400/20; }
+.badge-amber  { @apply badge bg-amber-500/15 text-amber-300 border border-amber-400/20; }
+.badge-pink   { @apply badge bg-neon-pink/15 text-neon-pink border border-neon-pink/25; }
 
 /* 文字截断 */
 .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* @提及 / #话题 链接样式 */
+.post-link-mention { @apply text-neon-purple font-medium hover:underline cursor-pointer; }
+.post-link-tag     { @apply text-neon-pink font-medium hover:underline cursor-pointer; }

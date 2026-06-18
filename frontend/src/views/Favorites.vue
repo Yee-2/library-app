@@ -30,13 +30,13 @@ function open(b: any) { router.push(`/book/${b.book_id}`) }
         <span>返回</span>
       </button>
       <h1 class="text-2xl font-bold tracking-tight">我的收藏</h1>
-      <span class="text-sm text-slate-500">{{ items.length }} 本</span>
+      <span class="text-sm text-ink-300">{{ items.length }} 本</span>
     </div>
-    <div v-if="loading" class="text-center text-slate-500 py-8">加载中…</div>
+    <div v-if="loading" class="text-center text-ink-300 py-8">加载中…</div>
     <div v-else-if="items.length === 0" class="text-center py-16">
-      <Star class="w-12 h-12 mx-auto text-slate-300 mb-2" :stroke-width="1.5" />
-      <p class="text-slate-500 mb-3">还没有收藏</p>
-      <p class="text-xs text-slate-400">在书籍详情页点 ☆ 即可收藏</p>
+      <Star class="w-12 h-12 mx-auto text-ink-300 mb-2" :stroke-width="1.5" />
+      <p class="text-ink-300 mb-3">还没有收藏</p>
+      <p class="text-xs text-ink-300">在书籍详情页点 ☆ 即可收藏</p>
     </div>
     <div v-else class="grid grid-cols-3 sm:grid-cols-4 gap-3">
       <div v-for="it in items" :key="it.book_id" class="cursor-pointer" @click="open(it)">

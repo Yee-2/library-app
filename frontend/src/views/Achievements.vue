@@ -36,10 +36,10 @@ function unlockedAt(id: string) {
         <span>返回</span>
       </button>
       <h1 class="text-2xl font-bold tracking-tight">成就徽章</h1>
-      <span class="text-sm text-slate-500">{{ mine.length }} / {{ items.length }}</span>
+      <span class="text-sm text-ink-300">{{ mine.length }} / {{ items.length }}</span>
     </div>
 
-    <div v-if="loading" class="text-center text-slate-500 py-8">加载中…</div>
+    <div v-if="loading" class="text-center text-ink-300 py-8">加载中…</div>
 
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 gap-3">
       <div
@@ -49,20 +49,20 @@ function unlockedAt(id: string) {
                  unlocked(a.id) ? '' : 'opacity-40']"
       >
         <div
-          class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-2 ring-2 ring-white shadow-sm"
+          class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-2 ring-2 ring-white/15 shadow-sm"
           :class="unlocked(a.id)
-            ? 'bg-gradient-to-br from-amber-100 to-amber-200'
-            : 'bg-slate-100'"
+            ? 'bg-gradient-to-br from-amber-500/25 to-amber-400/15'
+            : 'bg-ink-800/60'"
         >
           <span v-if="a.icon" class="text-3xl">{{ a.icon }}</span>
-          <Trophy v-else class="w-8 h-8 text-amber-500" :stroke-width="1.5" />
+          <Trophy v-else class="w-8 h-8 text-amber-300" :stroke-width="1.5" />
         </div>
         <div class="font-semibold text-sm">{{ a.name }}</div>
-        <div class="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">{{ a.description }}</div>
-        <div v-if="unlocked(a.id)" class="text-[10px] text-amber-600 mt-2 font-medium">
+        <div class="text-xs text-ink-300 mt-1 line-clamp-2 leading-relaxed">{{ a.description }}</div>
+        <div v-if="unlocked(a.id)" class="text-[10px] text-amber-300 mt-2 font-medium">
           ✓ {{ new Date(unlockedAt(a.id)).toLocaleDateString('zh-CN') }}
         </div>
-        <div v-else class="text-[10px] text-slate-400 mt-2 flex items-center justify-center gap-1">
+        <div v-else class="text-[10px] text-ink-300 mt-2 flex items-center justify-center gap-1">
           <Lock class="w-3 h-3" :stroke-width="1.75" />
           <span>未解锁</span>
         </div>

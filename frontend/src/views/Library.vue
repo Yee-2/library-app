@@ -142,28 +142,28 @@ function readBook(b: Book | string) {
     <!-- 搜索 + 格式筛选 -->
     <div class="flex flex-wrap items-center gap-2 mb-5">
       <div class="relative flex-1 min-w-[200px]">
-        <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" :stroke-width="1.75" />
+        <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-300" :stroke-width="1.75" />
         <input v-model="search" placeholder="搜索书名/作者" class="input pl-10" />
       </div>
-      <div class="inline-flex bg-slate-100 rounded-full p-1 text-sm gap-1">
+      <div class="inline-flex bg-ink-800/60 rounded-full p-1 text-sm gap-1">
         <button
           v-for="f in formats"
           :key="f"
           @click="filterFormat = f"
           :class="['px-3 h-8 rounded-full transition',
-                   filterFormat === f ? 'bg-white shadow-sm font-medium text-slate-900' : 'text-slate-500 hover:text-slate-700']"
+                   filterFormat === f ? 'bg-white shadow-sm font-medium text-ink-900 shadow-[0_0_14px_rgba(168,85,247,0.35)]' : 'text-ink-300 hover:text-ink-100']"
         >
           {{ f === 'all' ? '全部' : f.toUpperCase() }}
         </button>
       </div>
     </div>
 
-    <div v-if="loading" class="text-center text-slate-500 py-12">加载中…</div>
+    <div v-if="loading" class="text-center text-ink-300 py-12">加载中…</div>
 
     <!-- 空状态 -->
     <div v-else-if="filtered.length === 0" class="text-center py-16">
-      <BookOpen class="w-16 h-16 mx-auto text-slate-300 mb-3" :stroke-width="1.5" />
-      <p class="text-slate-500 mb-3">书架空空如也</p>
+      <BookOpen class="w-16 h-16 mx-auto text-ink-300 mb-3" :stroke-width="1.5" />
+      <p class="text-ink-300 mb-3">书架空空如也</p>
       <button @click="showUpload = true" class="btn-primary">
         <Upload class="w-4 h-4" :stroke-width="1.75" />
         <span>立即导入第一本</span>
@@ -177,17 +177,17 @@ function readBook(b: Book | string) {
         <!-- hover 操作按钮 -->
         <div class="absolute bottom-[68px] left-2 right-2 flex gap-1
                     opacity-0 group-hover/card:opacity-100 transition-opacity">
-          <button @click="readBook(b)" class="flex-1 text-xs h-7 rounded-lg bg-white/95 shadow text-brand-600 font-medium">
+          <button @click="readBook(b)" class="flex-1 text-xs h-7 rounded-lg bg-ink-850/95 shadow text-neon-purple font-medium">
             阅读
           </button>
-          <button @click="handleTogglePublic(b)" class="h-7 px-2 rounded-lg bg-white/95 shadow text-slate-600 flex items-center justify-center" :title="b.is_public ? '取消公开' : '公开'">
+          <button @click="handleTogglePublic(b)" class="h-7 px-2 rounded-lg bg-ink-850/95 shadow text-ink-200 flex items-center justify-center" :title="b.is_public ? '取消公开' : '公开'">
             <component :is="b.is_public ? Lock : Globe" class="w-3.5 h-3.5" :stroke-width="1.75" />
           </button>
-          <button @click="handleDelete(b)" class="h-7 px-2 rounded-lg bg-white/95 shadow text-rose-500 flex items-center justify-center" title="删除">
+          <button @click="handleDelete(b)" class="h-7 px-2 rounded-lg bg-ink-850/95 shadow text-rose-400 flex items-center justify-center" title="删除">
             <Trash2 class="w-3.5 h-3.5" :stroke-width="1.75" />
           </button>
         </div>
-        <div class="px-2.5 mt-1 flex items-center justify-between text-[10px] text-slate-400">
+        <div class="px-2.5 mt-1 flex items-center justify-between text-[10px] text-ink-300">
           <span>{{ formatDate(b.updated_at) }}</span>
         </div>
       </div>
@@ -214,34 +214,34 @@ function readBook(b: Book | string) {
           </div>
           <div class="space-y-4">
             <div>
-              <label class="text-xs font-medium text-slate-600 mb-1.5 block">图书文件（epub/pdf/txt/mobi）</label>
-              <input type="file" accept=".epub,.pdf,.txt,.mobi" @change="onFilePick" class="block w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100" />
-              <p v-if="file" class="text-xs text-slate-500 mt-1.5">已选：{{ file.name }}</p>
+              <label class="text-xs font-medium text-ink-200 mb-1.5 block">图书文件（epub/pdf/txt/mobi）</label>
+              <input type="file" accept=".epub,.pdf,.txt,.mobi" @change="onFilePick" class="block w-full text-sm text-ink-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-neon-purple/15 file:text-neon-purple hover:file:bg-neon-purple/25" />
+              <p v-if="file" class="text-xs text-ink-300 mt-1.5">已选：{{ file.name }}</p>
             </div>
             <div>
-              <label class="text-xs font-medium text-slate-600 mb-1.5 block">书名</label>
+              <label class="text-xs font-medium text-ink-200 mb-1.5 block">书名</label>
               <input v-model="title" class="input" />
             </div>
             <div>
-              <label class="text-xs font-medium text-slate-600 mb-1.5 block">作者</label>
+              <label class="text-xs font-medium text-ink-200 mb-1.5 block">作者</label>
               <input v-model="author" class="input" />
             </div>
             <div>
-              <label class="text-xs font-medium text-slate-600 mb-1.5 block">简介（可选）</label>
+              <label class="text-xs font-medium text-ink-200 mb-1.5 block">简介（可选）</label>
               <textarea v-model="description" rows="3" class="input"></textarea>
             </div>
             <div>
-              <label class="text-xs font-medium text-slate-600 mb-1.5 block">封面图（可选）</label>
-              <input type="file" accept="image/*" @change="onCoverPick" class="block w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100" />
+              <label class="text-xs font-medium text-ink-200 mb-1.5 block">封面图（可选）</label>
+              <input type="file" accept="image/*" @change="onCoverPick" class="block w-full text-sm text-ink-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-neon-purple/15 file:text-neon-purple hover:file:bg-neon-purple/25" />
             </div>
             <label class="flex items-center gap-3 cursor-pointer select-none">
               <span class="relative inline-flex items-center">
                 <input type="checkbox" v-model="isPublic" class="sr-only peer" />
-                <span class="w-10 h-6 rounded-full bg-slate-200 peer-checked:bg-brand-500 transition-colors pointer-events-none"></span>
+                <span class="w-10 h-6 rounded-full bg-ink-800 peer-checked:bg-neon-purple/150 transition-colors pointer-events-none"></span>
                 <span class="absolute left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform pointer-events-none peer-checked:translate-x-4"></span>
               </span>
-              <span class="text-sm text-slate-700 flex-1">上传到公开书库（其他用户可下载）</span>
-              <Globe class="w-4 h-4 text-slate-400" :stroke-width="1.75" />
+              <span class="text-sm text-ink-100 flex-1">上传到公开书库（其他用户可下载）</span>
+              <Globe class="w-4 h-4 text-ink-300" :stroke-width="1.75" />
             </label>
           </div>
           <div class="mt-6 flex justify-end gap-2">

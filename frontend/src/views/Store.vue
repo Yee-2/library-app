@@ -99,18 +99,18 @@ function openBook(id: string) {
   <div class="max-w-6xl mx-auto px-4 py-6">
     <div class="flex items-center justify-between mb-5">
       <h1 class="text-2xl font-bold tracking-tight">在线书库</h1>
-      <span class="text-sm text-slate-500">收录用户公开分享的图书</span>
+      <span class="text-sm text-ink-300">收录用户公开分享的图书</span>
     </div>
 
     <div class="relative mb-5">
-      <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" :stroke-width="1.75" />
+      <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-300" :stroke-width="1.75" />
       <input v-model="q" placeholder="搜索书名或作者…" class="input pl-10" />
     </div>
 
-    <div v-if="loading" class="text-center text-slate-500 py-12">加载中…</div>
+    <div v-if="loading" class="text-center text-ink-300 py-12">加载中…</div>
     <div v-else-if="books.length === 0" class="text-center py-16">
-      <BookOpen class="w-12 h-12 mx-auto text-slate-300 mb-2" :stroke-width="1.5" />
-      <p class="text-slate-500">暂无公开图书</p>
+      <BookOpen class="w-12 h-12 mx-auto text-ink-300 mb-2" :stroke-width="1.5" />
+      <p class="text-ink-300">暂无公开图书</p>
     </div>
 
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">

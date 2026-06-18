@@ -83,45 +83,45 @@ function fmtTime(sec: number) {
       <h1 class="text-2xl font-bold tracking-tight">阅读统计</h1>
     </div>
 
-    <div v-if="loading" class="text-center text-slate-500 py-8">加载中…</div>
+    <div v-if="loading" class="text-center text-ink-300 py-8">加载中…</div>
 
     <div v-else>
       <!-- 概览卡 -->
       <div class="grid grid-cols-2 gap-3 mb-4">
         <div class="card p-4 flex items-start gap-3">
-          <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
+          <div class="w-10 h-10 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
             <Clock class="w-5 h-5" :stroke-width="1.75" />
           </div>
           <div>
-            <div class="text-xs text-slate-500">近 30 天阅读</div>
-            <div class="text-2xl font-bold text-brand-600 mt-0.5">{{ fmtTime(totalSeconds) }}</div>
+            <div class="text-xs text-ink-300">近 30 天阅读</div>
+            <div class="text-2xl font-bold text-neon-purple mt-0.5">{{ fmtTime(totalSeconds) }}</div>
           </div>
         </div>
         <div class="card p-4 flex items-start gap-3">
-          <div class="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center flex-shrink-0">
+          <div class="w-10 h-10 rounded-xl bg-neon-purple/15 text-neon-purple flex items-center justify-center flex-shrink-0">
             <BarChart3 class="w-5 h-5" :stroke-width="1.75" />
           </div>
           <div>
-            <div class="text-xs text-slate-500">日均阅读</div>
-            <div class="text-2xl font-bold text-brand-600 mt-0.5">{{ fmtTime(avgSecondsPerDay) }}</div>
+            <div class="text-xs text-ink-300">日均阅读</div>
+            <div class="text-2xl font-bold text-neon-purple mt-0.5">{{ fmtTime(avgSecondsPerDay) }}</div>
           </div>
         </div>
         <div class="card p-4 flex items-start gap-3">
-          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center flex-shrink-0">
             <Type class="w-5 h-5" :stroke-width="1.75" />
           </div>
           <div>
-            <div class="text-xs text-slate-500">累计字数</div>
-            <div class="text-2xl font-bold text-brand-600 mt-0.5">{{ totalWords.toLocaleString() }}</div>
+            <div class="text-xs text-ink-300">累计字数</div>
+            <div class="text-2xl font-bold text-neon-purple mt-0.5">{{ totalWords.toLocaleString() }}</div>
           </div>
         </div>
         <div class="card p-4 flex items-start gap-3">
-          <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-300 flex items-center justify-center flex-shrink-0">
             <Hash class="w-5 h-5" :stroke-width="1.75" />
           </div>
           <div>
-            <div class="text-xs text-slate-500">阅读会话</div>
-            <div class="text-2xl font-bold text-brand-600 mt-0.5">{{ totalSessions }}</div>
+            <div class="text-xs text-ink-300">阅读会话</div>
+            <div class="text-2xl font-bold text-neon-purple mt-0.5">{{ totalSessions }}</div>
           </div>
         </div>
       </div>
@@ -138,14 +138,14 @@ function fmtTime(sec: number) {
       <div class="card p-4">
         <h3 class="font-semibold text-sm mb-3">藏书（{{ books.length }}）</h3>
         <div v-if="books.length === 0" class="py-6 text-center">
-          <BookOpen class="w-10 h-10 mx-auto text-slate-300 mb-2" :stroke-width="1.5" />
-          <p class="text-xs text-slate-400">还没有书</p>
+          <BookOpen class="w-10 h-10 mx-auto text-ink-300 mb-2" :stroke-width="1.5" />
+          <p class="text-xs text-ink-300">还没有书</p>
         </div>
         <div v-else class="space-y-2">
           <div v-for="(b, i) in books.slice(0, 8)" :key="b.id" class="flex items-center gap-2 text-sm">
-            <span class="w-5 text-slate-400 text-xs font-mono">{{ i + 1 }}</span>
+            <span class="w-5 text-ink-300 text-xs font-mono">{{ i + 1 }}</span>
             <div class="flex-1 truncate">{{ b.title }}</div>
-            <span class="text-xs text-slate-400 uppercase font-mono">{{ b.file_format }}</span>
+            <span class="text-xs text-ink-300 uppercase font-mono">{{ b.file_format }}</span>
           </div>
         </div>
       </div>
