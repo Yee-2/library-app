@@ -37,20 +37,21 @@ export async function uploadBook(file: File, meta: {
   if (upErr) throw upErr
 
   let coverUrl: string | null = null
+
+  // 上传用户指定的封面文件
   if (meta.coverFile) {
-    const coverId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    const coverExt = (meta.coverFile.name.split('.').pop() || 'jpg').toLowerCase()
-    const coverPath = `${user.id}/${coverId}.${coverExt}`
-    const { error: coverErr } = await supabase.storage
-      .from('book-covers')
-      .upload(coverPath, meta.coverFile, {
-        contentType: meta.coverFile.type || 'image/jpeg',
-      })
-    if (!coverErr) {
-      const { data: pub } = supabase.storage.from('book-covers').getPublicUrl(coverPath)
-      coverUrl = pub.publicUrl
+    coverUrl = await uploadCoverFile(meta.coverFile, user.id)
+  }
+
+  // 无封面文件 + EPUB 格式 → 尝试提取内嵌封面
+  if (!coverUrl && format === 'epub') {
+    try {
+      const embeddedCover = await extractEpubCover(file)
+      if (embeddedCover) {
+        coverUrl = await uploadCoverFile(embeddedCover, user.id)
+      }
+    } catch (e) {
+      console.warn('[uploadBook] EPUB 封面提取失败（不影响上传）:', e)
     }
   }
 
@@ -79,6 +80,41 @@ export async function uploadBook(file: File, meta: {
 
   if (error) throw error
   return data as Book
+}
+
+/** 上传封面文件到 Supabase Storage，返回公开 URL */
+async function uploadCoverFile(file: File, userId: string): Promise<string> {
+  const coverId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  const coverExt = (file.name.split('.').pop() || 'jpg').toLowerCase()
+  const coverPath = `${userId}/${coverId}.${coverExt}`
+  const { error: coverErr } = await supabase.storage
+    .from('book-covers')
+    .upload(coverPath, file, { contentType: file.type || 'image/jpeg' })
+  if (coverErr) throw coverErr
+  const { data: pub } = supabase.storage.from('book-covers').getPublicUrl(coverPath)
+  return pub.publicUrl
+}
+
+/** 从 EPUB 文件中提取封面图片，返回 File 对象；无封面返回 null */
+async function extractEpubCover(file: File): Promise<File | null> {
+  const ePub = (await import('epubjs')).default
+  const buf = await file.arrayBuffer()
+  const book = ePub(buf)
+  try {
+    const coverUrl = await book.coverUrl()
+    if (!coverUrl) return null
+    const res = await fetch(coverUrl)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    const ext = blob.type.split('/')[1] || 'jpg'
+    return new File([blob], `cover.${ext}`, { type: blob.type })
+  } catch {
+    return null
+  } finally {
+    book.destroy()
+  }
 }
 
 export async function listMyBooks() {
