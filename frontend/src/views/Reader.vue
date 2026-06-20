@@ -697,6 +697,7 @@ async function startTTS() {
 }
 
 async function playNextTTS() {
+  if (!ttsPlaying.value) return
   if (ttsIndex.value >= ttsQueue.value.length) {
     await autoPageAndContinue()
     return
@@ -708,6 +709,7 @@ async function playNextTTS() {
       voice: ttsVoice.value,
       speed: ttsSpeed.value,
     })
+    if (!ttsPlaying.value) { URL.revokeObjectURL(url); return }
     if (currentAudio.value) { currentAudio.value.pause(); URL.revokeObjectURL(currentAudio.value.src) }
     const audio = new Audio(url)
     currentAudio.value = audio
@@ -719,6 +721,7 @@ async function playNextTTS() {
     audio.onerror = () => { ttsIndex.value++; playNextTTS() }
     await audio.play()
   } catch (e: any) {
+    if (!ttsPlaying.value) return
     toast.error('TTS 失败：' + e.message)
     stopTTS()
   }
