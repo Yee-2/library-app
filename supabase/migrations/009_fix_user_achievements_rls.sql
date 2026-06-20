@@ -15,6 +15,7 @@
 
 -- 替换为仅自己可见
 drop policy if exists "user_ach_read_all" on public.user_achievements;
+drop policy if exists "user_ach_read_own" on public.user_achievements;
 create policy "user_ach_read_own" on public.user_achievements
   for select using (auth.uid() = user_id);
 
