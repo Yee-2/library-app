@@ -25,7 +25,7 @@ const error = ref('')
 const showSettings = ref(false)
 const showBookmarks = ref(false)
 const showNotes = ref(false)
-const showTTS = ref(false)
+const showTTSPanel = ref(false)
 
 // 快速跳转页码
 const pageInputVisible = ref(false)
@@ -662,7 +662,7 @@ async function startTTS() {
     const pdf = (readerRef.value as any)?.__pdf
     const cur = (readerRef.value as any)?.__currentPage || 1
     if (!pdf) { toast.error('PDF 未就绪'); return }
-    showTTS.value = true
+    showTTSPanel.value = true
     try {
       text = await extractPdfText(fileUrl.value, cur, cur + 2)   // 读当前 + 后 2 页
     } catch (e: any) {
@@ -674,7 +674,7 @@ async function startTTS() {
     toast.error('没有可朗读的文本')
     return
   }
-  showTTS.value = true
+  showTTSPanel.value = true
   ttsQueue.value = splitSentences(text, 280)
   ttsIndex.value = 0
   ttsPlaying.value = true
@@ -684,7 +684,7 @@ async function startTTS() {
 
 async function playNextTTS() {
   if (ttsIndex.value >= ttsQueue.value.length) {
-    stopTTS()
+    await autoPageAndContinue()
     return
   }
   if (ttsPaused.value) return
@@ -708,6 +708,82 @@ async function playNextTTS() {
     toast.error('TTS 失败：' + e.message)
     stopTTS()
   }
+}
+
+async function autoPageAndContinue() {
+  if (!book.value) { stopTTS(); return }
+  const fmt = book.value.file_format
+
+  // 判断是否最后一页
+  let isLast = false
+  if (fmt === 'txt') {
+    isLast = txtPage.value >= txtTotalPages.value - 1
+  } else if (fmt === 'pdf') {
+    const pdf = (readerRef.value as any)?.__pdf
+    const cur = (readerRef.value as any)?.__currentPage || 1
+    isLast = !pdf || cur >= pdf.numPages
+  } else if (fmt === 'epub') {
+    isLast = epubTotalPages.value > 0 && epubCurrentPage.value >= epubTotalPages.value
+  }
+
+  if (isLast) {
+    stopTTS()
+    toast.success('朗读完毕')
+    return
+  }
+
+  // 翻页
+  try {
+    if (fmt === 'epub') epubNext()
+    else if (fmt === 'pdf') pdfNext()
+    else txtNext()
+  } catch (e: any) {
+    toast.error('翻页失败：' + e.message)
+    stopTTS()
+    return
+  }
+
+  // 等待渲染完成
+  await nextTick()
+  await new Promise(r => setTimeout(r, 300))
+
+  // 提取新页面文本
+  let text = ''
+  if (fmt === 'txt') {
+    const pageSize = calcTxtPageSize()
+    const start = txtPage.value * pageSize
+    text = txtContent.value.slice(start, start + pageSize)
+  } else if (fmt === 'epub') {
+    try {
+      if (epubCurrentContents) {
+        text = (epubCurrentContents.window.document.body.textContent || '').slice(0, 5000)
+      }
+    } catch {}
+  } else if (fmt === 'pdf') {
+    const cur = (readerRef.value as any)?.__currentPage || 1
+    try {
+      text = await extractPdfText(fileUrl.value, cur, cur + 1)
+    } catch {}
+  }
+
+  if (!text) {
+    toast.error('下一页没有可朗读的文本')
+    stopTTS()
+    return
+  }
+
+  // 追加到队列
+  const newSentences = splitSentences(text, 280)
+  ttsQueue.value.push(...newSentences)
+
+  // 队列滚动窗口：> 100 句时丢弃前 50 句
+  if (ttsQueue.value.length > 100) {
+    const drop = 50
+    ttsQueue.value = ttsQueue.value.slice(drop)
+    ttsIndex.value = Math.max(0, ttsIndex.value - drop)
+  }
+
+  await playNextTTS()
 }
 
 function pauseTTS() { ttsPaused.value = true; currentAudio.value?.pause() }
@@ -807,7 +883,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <button @click="showNotes = true" class="btn-icon btn-ghost" title="笔记">
             <NotebookPen class="w-5 h-5" :stroke-width="1.75" />
           </button>
-          <button @click="showTTS = true; startTTS()" class="btn-icon btn-ghost" title="AI 听书">
+          <button @click="showTTSPanel = true; startTTS()" class="btn-icon btn-ghost" title="AI 听书">
             <Volume2 class="w-5 h-5" :stroke-width="1.75" />
           </button>
           <button @click="showSettings = true" class="btn-icon btn-ghost" title="设置">
@@ -836,13 +912,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         else if (x > w * 2 / 3) nextPage()
       }
     }">
-      <div ref="readerRef" class="reader-area" style="min-height: calc(100vh - 120px);"></div>
+      <div ref="readerRef" class="reader-area" :class="{ 'pb-16': ttsPlaying }" style="min-height: calc(100vh - 120px);"></div>
     </div>
 
     <!-- 底部翻页 -->
     <footer
       v-if="!loading && !error && book"
-      class="sticky bottom-0 bg-white shadow-sm backdrop-blur border-t border-primary-200 py-2"
+      class="sticky bg-white shadow-sm backdrop-blur border-t border-primary-200 py-2 transition-all duration-300"
+      :style="{ bottom: ttsPlaying && !showTTSPanel ? '48px' : '0' }"
     >
       <div class="max-w-4xl mx-auto px-4 flex items-center justify-between text-sm">
         <button
@@ -1001,11 +1078,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     </div>
 
     <!-- 弹窗：TTS -->
-    <div v-if="showTTS" class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" @click.self="showTTS = false">
+    <div v-if="showTTSPanel" class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" @click.self="showTTSPanel = false">
       <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5">
         <div class="flex justify-between items-center mb-4">
           <h3 class="font-semibold">AI 听书</h3>
-          <button @click="showTTS = false; stopTTS()" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
+          <button @click="showTTSPanel = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
         </div>
 
         <section class="mb-4">
@@ -1056,6 +1133,35 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <p class="text-xs text-ink-300 mt-3">由 MiniMax M3 TTS 提供支持</p>
       </div>
     </div>
+
+    <!-- 迷你播放条 -->
+    <transition
+      enter-active-class="transition-transform duration-300 ease-out"
+      leave-active-class="transition-transform duration-200 ease-in"
+      enter-from-class="translate-y-full"
+      leave-to-class="translate-y-full"
+    >
+      <div v-if="ttsPlaying && !showTTSPanel"
+           @click="showTTSPanel = true"
+           class="fixed bottom-0 left-0 right-0 z-40 bg-white shadow-sm border-t border-primary-200 flex items-center justify-between px-4 h-12 cursor-pointer">
+        <div class="flex items-center gap-2 text-sm">
+          <Volume2 class="w-4 h-4 text-primary-500 animate-pulse" :stroke-width="1.75" />
+          <span class="text-ink-500">AI 听书中</span>
+          <span class="text-ink-300">· {{ ttsIndex + 1 }}/{{ ttsQueue.length }}</span>
+        </div>
+        <div class="flex items-center gap-2" @click.stop>
+          <button v-if="!ttsPaused" @click="pauseTTS" class="btn-icon btn-ghost !p-1.5">
+            <Pause class="w-4 h-4" :stroke-width="1.75" />
+          </button>
+          <button v-else @click="resumeTTS" class="btn-icon btn-ghost !p-1.5">
+            <Play class="w-4 h-4" :stroke-width="1.75" />
+          </button>
+          <button @click="stopTTS" class="btn-icon btn-ghost !p-1.5">
+            <Square class="w-4 h-4" :stroke-width="1.75" />
+          </button>
+        </div>
+      </div>
+    </transition>
 
     <!-- 弹窗：目录 -->
     <div v-if="showToc" class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" @click.self="showToc = false">
