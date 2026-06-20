@@ -647,17 +647,33 @@ async function startTTS() {
     const pageSize = calcTxtPageSize()
     const start = txtPage.value * pageSize
     text = txtContent.value.slice(start, start + pageSize)
+    console.log('[tts] txt page =', txtPage.value, 'start =', start, 'text length =', text.length)
   } else if (book.value?.file_format === 'epub' && epubRendition) {
-    // 取当前章节文本（通过 content hook 缓存的 contents）
+    // 优先从 rendition 当前 view 获取 contents（避免 epubCurrentContents 因 view 重建而 stale）
     try {
-      if (epubCurrentContents) {
-        text = (epubCurrentContents.window.document.body.textContent || '').slice(0, 5000)
-      } else {
-        text = '当前章节无法提取文本'
+      let contents: any = null
+      // 方式 1：从 rendition.manager 当前 view 取
+      const currentView = epubRendition.manager?.current?.()
+      if (currentView?.contents) {
+        contents = currentView.contents
       }
-    } catch {
-      text = '当前章节无法提取文本'
+      // 方式 2：fallback 到 content hook 缓存
+      if (!contents) contents = epubCurrentContents
+      // 方式 3：从 readerRef 内的 iframe 取
+      if (!contents && readerRef.value) {
+        const iframe = readerRef.value.querySelector('iframe')
+        if (iframe?.contentWindow?.document?.body) {
+          text = (iframe.contentWindow.document.body.textContent || '').slice(0, 5000)
+        }
+      }
+      if (!text && contents) {
+        text = (contents.window.document.body.textContent || '').slice(0, 5000)
+      }
+      console.log('[tts] epub text length =', text.length, 'epubCurrentPage =', epubCurrentPage.value)
+    } catch (e) {
+      console.warn('[tts] epub text extraction failed', e)
     }
+    if (!text) text = '当前章节无法提取文本'
   } else if (book.value?.file_format === 'pdf') {
     const pdf = (readerRef.value as any)?.__pdf
     const cur = (readerRef.value as any)?.__currentPage || 1
@@ -665,6 +681,7 @@ async function startTTS() {
     showTTSPanel.value = true
     try {
       text = await extractPdfText(fileUrl.value, cur, cur + 2)   // 读当前 + 后 2 页
+      console.log('[tts] pdf page =', cur, 'text length =', text.length)
     } catch (e: any) {
       toast.error('PDF 文本提取失败：' + e.message)
       return
@@ -755,8 +772,18 @@ async function autoPageAndContinue() {
     text = txtContent.value.slice(start, start + pageSize)
   } else if (fmt === 'epub') {
     try {
-      if (epubCurrentContents) {
-        text = (epubCurrentContents.window.document.body.textContent || '').slice(0, 5000)
+      let contents: any = null
+      const currentView = epubRendition?.manager?.current?.()
+      if (currentView?.contents) contents = currentView.contents
+      if (!contents) contents = epubCurrentContents
+      if (!contents && readerRef.value) {
+        const iframe = readerRef.value.querySelector('iframe')
+        if (iframe?.contentWindow?.document?.body) {
+          text = (iframe.contentWindow.document.body.textContent || '').slice(0, 5000)
+        }
+      }
+      if (!text && contents) {
+        text = (contents.window.document.body.textContent || '').slice(0, 5000)
       }
     } catch {}
   } else if (fmt === 'pdf') {
