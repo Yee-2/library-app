@@ -647,7 +647,7 @@ async function startTTS() {
     const pageSize = calcTxtPageSize()
     const start = txtPage.value * pageSize
     text = txtContent.value.slice(start, start + pageSize)
-    console.log('[tts] txt page =', txtPage.value, 'start =', start, 'text length =', text.length)
+    console.log('[tts] txt page =', txtPage.value, 'start =', start, 'text length =', text.length, 'preview =', text.slice(0, 100))
   } else if (book.value?.file_format === 'epub' && epubRendition) {
     // 优先从 rendition 当前 view 获取 contents（避免 epubCurrentContents 因 view 重建而 stale）
     try {
@@ -669,7 +669,7 @@ async function startTTS() {
       if (!text && contents) {
         text = (contents.window.document.body.textContent || '').slice(0, 5000)
       }
-      console.log('[tts] epub text length =', text.length, 'epubCurrentPage =', epubCurrentPage.value)
+      console.log('[tts] epub text length =', text.length, 'epubCurrentPage =', epubCurrentPage.value, 'preview =', text.slice(0, 100))
     } catch (e) {
       console.warn('[tts] epub text extraction failed', e)
     }
@@ -696,6 +696,8 @@ async function startTTS() {
   ttsIndex.value = 0
   ttsPlaying.value = true
   ttsPaused.value = false
+  console.log('[tts] queue size =', ttsQueue.value.length, 'first =', ttsQueue.value[0]?.slice(0, 80))
+  toast.info('开始朗读：' + (text.slice(0, 50) + '...'))
   await playNextTTS()
 }
 
