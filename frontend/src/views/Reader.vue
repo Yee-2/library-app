@@ -53,6 +53,7 @@ let onResize: (() => void) | null = null
 
 // 心跳：估算本次阅读时长（秒），并上报
 function reportHeartbeat() {
+  if (!bookId.value) return
   const now = Date.now()
   const last = ach.lastHeartbeat || now
   const seconds = Math.max(0, Math.min(600, Math.round((now - last) / 1000)))
