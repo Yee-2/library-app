@@ -25,21 +25,25 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- 用户只能查看自己的通知
+DROP POLICY IF EXISTS "users_select_own_notifications" ON notifications;
 CREATE POLICY "users_select_own_notifications"
   ON notifications FOR SELECT
   USING (auth.uid() = user_id);
 
 -- 用户只能更新自己的通知（标记已读）
+DROP POLICY IF EXISTS "users_update_own_notifications" ON notifications;
 CREATE POLICY "users_update_own_notifications"
   ON notifications FOR UPDATE
   USING (auth.uid() = user_id);
 
 -- 系统通过函数可以插入通知（由触发器调用）
+DROP POLICY IF EXISTS "system_insert_notifications" ON notifications;
 CREATE POLICY "system_insert_notifications"
   ON notifications FOR INSERT
   WITH CHECK (true);
 
 -- 用户只能删除自己的通知
+DROP POLICY IF EXISTS "users_delete_own_notifications" ON notifications;
 CREATE POLICY "users_delete_own_notifications"
   ON notifications FOR DELETE
   USING (auth.uid() = user_id);
