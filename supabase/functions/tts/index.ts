@@ -3,7 +3,7 @@
 // Deploy: supabase functions deploy tts --no-verify-jwt
 
 const MINIMAX_API_KEY = Deno.env.get("MINIMAX_API_KEY") ?? "";
-const MINIMAX_TTS_URL = Deno.env.get("MINIMAX_TTS_URL") ?? "https://api.minimaxi.chat/v1/t2a_v2";
+const MINIMAX_TTS_URL = Deno.env.get("MINIMAX_TTS_URL") ?? "https://api.minimaxi.com/v1/t2a_v2";
 const MINIMAX_GROUP_ID = Deno.env.get("MINIMAX_GROUP_ID") ?? "";
 
 const corsHeaders = {
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
 
     // Call MiniMax TTS
     const ttsBody = {
-      model: "speech-01-turbo",
+      model: "speech-2.8-hd",
       text: text.slice(0, 5000),
       stream: false,
       voice_setting: {

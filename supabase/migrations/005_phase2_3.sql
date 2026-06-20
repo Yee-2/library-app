@@ -180,7 +180,7 @@ create policy "user_ach_insert_self" on public.user_achievements
 -- 升级 books 的全文索引（支持简介 + 标签）
 -- =============================================================
 drop index if exists books_title_idx;
-create index books_fulltext_idx on public.books
+create index if not exists books_fulltext_idx on public.books
   using gin(to_tsvector('simple',
     coalesce(title,'') || ' ' ||
     coalesce(author,'') || ' ' ||

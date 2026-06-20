@@ -316,6 +316,7 @@ function escapeHtml(s: string) {
 
 let epubBook: any = null
 let epubRendition: any = null
+let epubCurrentContents: any = null   // 当前 EPUB 页面的 contents（供 TTS 等使用）
 let epubBlobUrl: string | null = null
 let epubKeyHandler: ((e: KeyboardEvent) => void) | null = null
 let touchStartHandler: ((e: TouchEvent) => void) | null = null
@@ -339,6 +340,7 @@ async function renderEpub() {
     try { epubRendition.destroy() } catch {}
     epubRendition = null
     epubBook = null
+    epubCurrentContents = null
   }
   if (epubBlobUrl) { URL.revokeObjectURL(epubBlobUrl); epubBlobUrl = null }
   if (!readerRef.value) return
@@ -391,6 +393,7 @@ async function renderEpub() {
 
   // EPUB iframe 内部点击和触摸翻页（通过 epubjs hooks 注册到 iframe 内部）
   rendition.hooks.content.register((contents: any) => {
+    epubCurrentContents = contents   // 保存当前页面引用，供 TTS 等功能使用
     try {
       const docEl = contents.window.document.documentElement
 
@@ -645,11 +648,10 @@ async function startTTS() {
     const start = txtPage.value * pageSize
     text = txtContent.value.slice(start, start + pageSize)
   } else if (book.value?.file_format === 'epub' && epubRendition) {
-    // 取当前章节
+    // 取当前章节文本（通过 content hook 缓存的 contents）
     try {
-      const contents = epubRendition.book.transport?.get?.('current')?.contents
-      if (contents) {
-        text = (contents.window.document.body.textContent || '').slice(0, 5000)
+      if (epubCurrentContents) {
+        text = (epubCurrentContents.window.document.body.textContent || '').slice(0, 5000)
       } else {
         text = '当前章节无法提取文本'
       }
