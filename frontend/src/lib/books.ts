@@ -135,17 +135,20 @@ export async function listMyBooks() {
 export async function listMyLocalBooks() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
+  // 先查出已导入的古登堡 book_id 列表
+  const { data: gbList } = await supabase
+    .from('gutenberg_books')
+    .select('book_id')
+  const gutenbergIds = new Set((gbList ?? []).map(b => b.book_id))
+
   const { data, error } = await supabase
     .from('books')
     .select('*')
     .eq('user_id', user.id)
-    // 通过 NOT EXISTS 排除有 gutenberg_books 记录的书
-    .not('id', 'in', `(
-      select book_id from public.gutenberg_books
-    )`)
     .order('updated_at', { ascending: false })
   if (error) throw error
-  return data as Book[]
+  // 在 JS 层过滤掉古登堡书
+  return (data ?? []).filter(b => !gutenbergIds.has(b.id)) as Book[]
 }
 
 /**
