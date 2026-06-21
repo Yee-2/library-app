@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { getBook, getMyBookFileUrl, fetchOnlineBookFile, checkIsGutenbergBook, upsertProgress, getProgress, listBookmarks, addBookmark, deleteBookmark, listNotes, addNote, deleteNote, reportReadingHeartbeat } from '@/lib/books'
+import { getBook, getMyBookFileUrl, fetchOnlineBookFile, checkIsGutenbergBook, checkIsWikisourceBook, fetchWikisourceBookFile, upsertProgress, getProgress, listBookmarks, addBookmark, deleteBookmark, listNotes, addNote, deleteNote, reportReadingHeartbeat } from '@/lib/books'
 import { toast } from '@/lib/toast'
 import { useReaderStore } from '@/stores/reader'
 import { ttsSynthesize, splitSentences, extractPdfText } from '@/lib/tts'
@@ -119,8 +119,22 @@ onMounted(async () => {
         book.value = { ...loaded, file_format: online.format }
       }
     } else {
-      console.log('[reader] creating signed url...')
-      fileUrl.value = await getMyBookFileUrl(loaded)
+      // 检测是否维基文库在线书
+      const wsInfo = await checkIsWikisourceBook(bookId.value)
+      if (wsInfo?.isWikisource) {
+        console.log('[reader] detected wikisource book, page =', wsInfo.page_title)
+        isOnlineBook.value = true
+        const data = await fetchWikisourceBookFile(bookId.value)
+        // 维基文库返回纯文本，创建 txt blob
+        const blob = new Blob([data.content], { type: 'text/plain; charset=utf-8' })
+        onlineBlobUrl.value = URL.createObjectURL(blob)
+        fileUrl.value = onlineBlobUrl.value
+        loaded.file_format = 'txt'
+        book.value = { ...loaded, file_format: 'txt' }
+      } else {
+        console.log('[reader] creating signed url...')
+        fileUrl.value = await getMyBookFileUrl(loaded)
+      }
     }
     console.log('[reader] fileUrl =', fileUrl.value.slice(0, 80) + '...')
 

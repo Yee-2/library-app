@@ -4,40 +4,92 @@ import { useRouter } from 'vue-router'
 import { debounce } from '@/lib/utils'
 import { searchPublicBooksFulltext } from '@/lib/books'
 import { useGutenbergSearch } from '@/composables/useGutenbergSearch'
+import { useWikisourceSearch } from '@/composables/useWikisourceSearch'
 import { isGutenbergEnabled } from '@/lib/featureFlags'
 import GutenbergBookCard from '@/components/GutenbergBookCard.vue'
+import WikisourceBookCard from '@/components/WikisourceBookCard.vue'
 import {
-  ArrowLeft, Search as SearchIcon, BookOpen, TrendingUp, Library as LibraryIcon
+  ArrowLeft, Search as SearchIcon, BookOpen, TrendingUp, Library as LibraryIcon, FileText
 } from 'lucide-vue-next'
+import { toast } from '@/lib/toast'
 
 const router = useRouter()
 const q = ref('')
 const results = ref<any[]>([])              // 公开书库结果
 const gutenbergResults = ref<any[]>([])     // 古登堡结果
+const wikisourceResults = ref<any[]>([])    // 维基文库结果
 const loading = ref(false)
 const gutenbergLoading = ref(false)
+const wikisourceLoading = ref(false)
 const error = ref('')
 const gutenbergError = ref('')
+const wikisourceError = ref('')
 const hasSearched = ref(false)
+const importingWikisource = ref('')  // 正在导入的书名
 const quickTags = ['武侠', '科幻', '推理', '历史', '言情', '哲学', '诗集', '散文', '名著', '编程']
 
 const gutenbergEnabled = isGutenbergEnabled()
 const gutenberg = useGutenbergSearch()
+const wikisource = useWikisourceSearch()
+
+async function importWikisource(pageTitle: string) {
+  if (importingWikisource.value) return
+  importingWikisource.value = pageTitle
+  try {
+    const { supabase } = await import('@/lib/supabase')
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      toast.error('请先登录')
+      router.push('/login')
+      return
+    }
+    const token = session.access_token
+    const res = await fetch(
+      'https://ekeqxffoosynbitfmrqr.supabase.co/functions/v1/wikisource-import',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ page_title: pageTitle }),
+      }
+    )
+    const data = await res.json()
+    if (!res.ok) {
+      toast.error(data?.message || data?.error || '导入失败')
+      return
+    }
+    if (data.exists) {
+      toast.info('已在你的书架')
+    } else {
+      toast.success('导入成功')
+    }
+    router.push(`/book/${data.book_id}`)
+  } catch (e: any) {
+    console.error('[wikisource-import]', e)
+    toast.error(e?.message || '导入失败')
+  } finally {
+    importingWikisource.value = ''
+  }
+}
 
 const doSearch = debounce(async () => {
   if (!q.value.trim()) {
     results.value = []
     gutenbergResults.value = []
+    wikisourceResults.value = []
     error.value = ''
     gutenbergError.value = ''
+    wikisourceError.value = ''
     hasSearched.value = false
     return
   }
   hasSearched.value = true
 
-  // 两个搜索并发执行（独立 promise，任一失败不影响另一个）
   loading.value = true
   if (gutenbergEnabled) gutenbergLoading.value = true
+  wikisourceLoading.value = true
 
   const publicSearch = searchPublicBooksFulltext(q.value.trim())
     .then(data => { results.value = data; error.value = '' })
@@ -66,6 +118,21 @@ const doSearch = debounce(async () => {
     )
   }
 
+  // 维基文库搜索（中文专用，不限 feature flag）
+  searches.push(
+    wikisource.search(q.value.trim())
+      .then(() => {
+        wikisourceResults.value = wikisource.results.value
+        wikisourceError.value = wikisource.error.value
+      })
+      .catch(e => {
+        console.error('[search wikisource]', e)
+        wikisourceError.value = e?.message ?? '维基文库搜索失败'
+        wikisourceResults.value = []
+      })
+      .finally(() => { wikisourceLoading.value = false })
+  )
+
   await Promise.all(searches)
 }, 300)
 
@@ -76,8 +143,11 @@ function pickTag(t: string) {
 
 function go(b: any) { router.push(`/book/${b.id}`) }
 
-const totalCount = computed(() => results.value.length + gutenbergResults.value.length)
+const totalCount = computed(() =>
+  results.value.length + gutenbergResults.value.length + wikisourceResults.value.length
+)
 const showGutenbergSection = computed(() => gutenbergResults.value.length > 0)
+const showWikisourceSection = computed(() => wikisourceResults.value.length > 0)
 const showPublicSection = computed(() => results.value.length > 0)
 </script>
 
@@ -119,7 +189,7 @@ const showPublicSection = computed(() => results.value.length > 0)
     </div>
 
     <!-- 加载中 -->
-    <div v-if="(loading || gutenbergLoading) && totalCount === 0" class="text-center text-ink-300 py-8">
+    <div v-if="(loading || gutenbergLoading || wikisourceLoading) && totalCount === 0" class="text-center text-ink-300 py-8">
       搜索中…
     </div>
 
@@ -131,8 +201,8 @@ const showPublicSection = computed(() => results.value.length > 0)
       <p class="text-xs text-ink-300 mt-1">试试其他关键词，或浏览公开书库</p>
     </div>
 
-    <!-- 古登堡分组（优先展示） -->
-    <template v-else-if="hasSearched && (showGutenbergSection || gutenbergLoading)">
+    <!-- 古登堡分组 -->
+    <template v-else-if="hasSearched && (showGutenbergSection || showWikisourceSection || gutenbergLoading || wikisourceLoading)">
       <div v-if="showGutenbergSection || gutenbergLoading" class="mb-6">
         <div class="flex items-center gap-2 mb-3">
           <LibraryIcon class="w-4 h-4 text-primary-600" :stroke-width="2" />
@@ -140,7 +210,7 @@ const showPublicSection = computed(() => results.value.length > 0)
           <span class="text-xs text-ink-300">
             {{ gutenbergLoading ? '搜索中…' : `${gutenbergResults.length} 本` }}
           </span>
-          <span class="text-xs text-ink-300">· 公有领域 · 免费</span>
+          <span class="text-xs text-ink-300">· 公有领域 · {{ gutenbergEnabled ? '' : '未启用' }}</span>
         </div>
         <div v-if="gutenbergError" class="text-center text-rose-400 py-4 text-sm">
           古登堡搜索失败：{{ gutenbergError }}
@@ -150,6 +220,30 @@ const showPublicSection = computed(() => results.value.length > 0)
             v-for="b in gutenbergResults"
             :key="b.gutenberg_id"
             :book="b"
+          />
+        </div>
+      </div>
+
+      <!-- 维基文库分组 -->
+      <div v-if="showWikisourceSection || wikisourceLoading" class="mb-6">
+        <div class="flex items-center gap-2 mb-3">
+          <FileText class="w-4 h-4 text-amber-600" :stroke-width="2" />
+          <h2 class="text-sm font-semibold text-ink-700">维基文库</h2>
+          <span class="text-xs text-ink-300">
+            {{ wikisourceLoading ? '搜索中…' : `${wikisourceResults.length} 本` }}
+          </span>
+          <span class="text-xs text-ink-300">· 中文公版 · 免费</span>
+        </div>
+        <div v-if="wikisourceError" class="text-center text-rose-400 py-4 text-sm">
+          维基文库搜索失败：{{ wikisourceError }}
+        </div>
+        <div v-else class="space-y-2">
+          <WikisourceBookCard
+            v-for="b in wikisourceResults"
+            :key="b.pageid"
+            :book="b"
+            :importing="importingWikisource === b.title"
+            @import="importWikisource"
           />
         </div>
       </div>

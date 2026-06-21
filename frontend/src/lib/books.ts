@@ -130,16 +130,20 @@ export async function listMyBooks() {
 }
 
 /**
- * 列出我的本地书（排除在线导入的古登堡书）
+ * 列出我的本地书（排除所有在线书）
  */
 export async function listMyLocalBooks() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
-  // 先查出已导入的古登堡 book_id 列表
-  const { data: gbList } = await supabase
-    .from('gutenberg_books')
-    .select('book_id')
-  const gutenbergIds = new Set((gbList ?? []).map(b => b.book_id))
+  // 先查出已导入的在线书 book_id
+  const [gbList, wsList] = await Promise.all([
+    supabase.from('gutenberg_books').select('book_id'),
+    supabase.from('wikisource_books').select('book_id'),
+  ])
+  const onlineIds = new Set([
+    ...(gbList.data ?? []).map(b => b.book_id),
+    ...(wsList.data ?? []).map(b => b.book_id),
+  ])
 
   const { data, error } = await supabase
     .from('books')
@@ -147,30 +151,95 @@ export async function listMyLocalBooks() {
     .eq('user_id', user.id)
     .order('updated_at', { ascending: false })
   if (error) throw error
-  // 在 JS 层过滤掉古登堡书
-  return (data ?? []).filter(b => !gutenbergIds.has(b.id)) as Book[]
+  return (data ?? []).filter(b => !onlineIds.has(b.id)) as Book[]
 }
 
 /**
- * 列出我的在线古登堡书（JOIN gutenberg_books 拿 language/format）
+ * 列出我的在线书（古登堡 + 维基文库）
  */
 export async function listMyOnlineBooks() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
   const { data, error } = await supabase
     .from('books')
-    .select('*, gutenberg_books!inner(language, format, gutenberg_id)')
+    .select('*')
     .eq('user_id', user.id)
     .order('updated_at', { ascending: false })
   if (error) throw error
-  return (data ?? []) as Array<Book & {
-    gutenberg_books: { language: string; format: string | null; gutenberg_id: number }[]
-  }>
+
+  if (!data) return []
+
+  // 查哪些是古登堡/维基文库
+  const bookIds = data.map(b => b.id)
+  const [gbList, wsList] = await Promise.all([
+    supabase.from('gutenberg_books').select('book_id, language, format, gutenberg_id').in('book_id', bookIds),
+    supabase.from('wikisource_books').select('book_id, page_title').in('book_id', bookIds),
+  ])
+  const gbMap = new Map((gbList.data ?? []).map(b => [b.book_id, b]))
+  const wsMap = new Map((wsList.data ?? []).map(b => [b.book_id, b]))
+
+  return (data ?? []).filter(b => gbMap.has(b.id) || wsMap.has(b.id)).map(b => ({
+    ...b,
+    gutenberg_books: gbMap.has(b.id) ? [gbMap.get(b.id)!] : [],
+    wikisource_books: wsMap.has(b.id) ? [wsMap.get(b.id)!] : [],
+  }))
 }
 
 /**
- * 检查一本书是否是古登堡在线书（Reader.vue 用）
+ * 检查一本书是否是维基文库在线阅读
  */
+export async function checkIsWikisourceBook(bookId: string): Promise<{
+  isWikisource: boolean
+  page_title?: string
+  page_id?: number
+} | null> {
+  const { data, error } = await supabase
+    .from('wikisource_books')
+    .select('page_title, page_id')
+    .eq('book_id', bookId)
+    .maybeSingle()
+  if (error) {
+    console.warn('[checkIsWikisourceBook]', error)
+    return null
+  }
+  if (!data) return { isWikisource: false }
+  return { isWikisource: true, page_title: data.page_title, page_id: data.page_id }
+}
+
+/**
+ * 从 wikisource-fetch Edge Function 拉取中文公版书内容
+ */
+export async function fetchWikisourceBookFile(bookId: string): Promise<{
+  content: string
+  title: string
+  size: number
+}> {
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token
+  if (!token) throw new Error('未登录或会话已过期')
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30_000)
+
+  try {
+    const res = await fetch(`${FUNCTIONS_URL}/wikisource-fetch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ book_id: bookId }),
+      signal: controller.signal,
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data?.message || data?.error || `拉取失败 (${res.status})`)
+    }
+    return data
+  } finally {
+    clearTimeout(timeout)
+  }
+}
 export async function checkIsGutenbergBook(bookId: string): Promise<{
   isGutenberg: boolean
   gutenberg_id?: number

@@ -322,6 +322,11 @@ if (highlightId.value) {
           {{ b.gutenberg_books[0].language === 'zh' ? '🇨🇳' : '🇺🇸' }}
           {{ b.gutenberg_books[0].language.toUpperCase() }}
         </span>
+        <span v-if="tab === 'online' && b.wikisource_books?.[0]?.page_title"
+              class="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full
+                     bg-amber-700/90 text-white text-[10px] font-medium backdrop-blur-sm">
+          🇨🇳 文库
+        </span>
         <!-- hover 操作按钮（在线图书没有公开/删除上传，只保留阅读） -->
         <div class="absolute bottom-[68px] left-2 right-2 flex gap-1
                     opacity-0 group-hover/card:opacity-100 transition-opacity">
