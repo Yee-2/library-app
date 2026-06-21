@@ -16,8 +16,29 @@
 
 - 古登堡由 Michael Hart 于 1971 年创立，所有收录书籍均为版权已过期或作者主动放弃版权
 - 收录约 **7 万+** 本图书，覆盖文学、哲学、历史、科学等
-- 提供开放 API：[Gutendex](https://gutendex.com/)（无认证、无配额、无费用）
-- 古登堡官方允许并鼓励第三方应用集成
+- 古登堡官方明确将**目录数据（catalog metadata）发布到公共领域**，并允许批量下载文件
+- 文件下载走古登堡主站 `gutenberg.org` 的 `/cache/` 和 `/files/` 路径（robots.txt 允许）
+
+### 1.1.1 数据源技术细节（实测确认）
+
+**关键发现：** 流行的第三方 API 镜像 [Gutendex](https://gutendex.com) **不可用**：
+- ❌ Cloudflare 反爬虫保护（HTTP 403 challenge）
+- ❌ robots.txt 明确禁止所有爬虫访问 `/books/` 路径
+- ❌ robots.txt 明确禁止 ClaudeBot/GPTBot 等 AI 应用爬虫
+
+**替代方案（古登堡官方支持）：**
+- ✅ 离线目录 `pg_catalog.csv`：[https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv](https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv)
+  - 每周更新一次，包含全部约 7 万本元数据（id, title, author, language, format, download_count）
+  - CSV 格式，可直接导入 PostgreSQL
+- ✅ 文件下载走官方路径：`https://www.gutenberg.org/cache/epub/{id}/pg{id}-images-3.epub`
+- ✅ 古登堡 [robot access policy](https://www.gutenberg.org/policy/robot_access.html) 明确允许第三方应用集成
+- ✅ 速率限制建议：单 IP ≥ 2 秒间隔（古登堡推荐）
+
+**采用策略：**
+1. 一次性导入 `pg_catalog.csv` 到 Supabase `gutenberg_catalog` 表（中文 + 英文，按 language 过滤）
+2. 搜索完全本地（PostgreSQL `ILIKE` 查询）—— 零网络延迟、零网络依赖
+3. 书籍文件按需从 `gutenberg.org` 代理下载
+4. 定期（每周）增量同步目录（新增书、删除已下架书）—— MVP 手动触发，后续加 cron
 
 ### 1.2 目标
 
@@ -147,7 +168,7 @@
 
 保持现有结构完全不动。所有用户上传的书继续走 books 表，不受古登堡功能影响。
 
-### 4.2 新表：gutenberg_books
+### 4.2 新表：gutenberg_books（用户导入记录）
 
 ```sql
 CREATE TABLE gutenberg_books (
@@ -191,25 +212,64 @@ CREATE POLICY "用户只能访问自己的古登堡书"
 - `format`：用户首次阅读时**自动选择**（古登堡一本书通常提供 epub + txt，优先 epub），存到这里供后续复用
 - `imported_at`：导入时间
 
-### 4.3 为什么用双表 1:1 而不是 books 加字段
+### 4.3 新表：gutenberg_catalog（古登堡全量元数据）
 
-| 维度 | books 加字段 | **双表 1:1（采用）** |
-|------|------------|---------------------|
-| books 表改动 | 4 个字段 + 索引 | **零改动** |
-| reading_progress / bookmarks / notes 改动 | 无 | **无** |
-| 未来扩展（如下载次数、缓存命中） | 全部塞 books 表 | **独立 gutenberg_books 表** |
-| 字段语义污染 | local 书多了 4 个无意义字段 | **彻底隔离** |
-| 导入复杂度 | INSERT 1 行 | INSERT 2 行（事务） |
-| 回滚成本 | DROP 4 列 | DROP 1 张表 |
+```sql
+CREATE TABLE gutenberg_catalog (
+  gutenberg_id   INT PRIMARY KEY,         -- 古登堡内部 ID
+  title          TEXT NOT NULL,
+  author         TEXT,                    -- 多个作者用 ; 分隔
+  language       CHAR(2) NOT NULL CHECK (language IN ('zh', 'en')),
+  epub_url       TEXT,                    -- 文件下载 URL
+  txt_url        TEXT,
+  cover_url      TEXT,                    -- 封面 URL（部分书有）
+  download_count INT DEFAULT 0,           -- 古登堡下载热度（用于「热门」排序）
+  updated_at     TIMESTAMPTZ DEFAULT now()
+);
 
-### 4.4 唯一约束与查重
+-- 搜索性能
+CREATE INDEX idx_gutenberg_catalog_lang
+  ON gutenberg_catalog(language);
+CREATE INDEX idx_gutenberg_catalog_title_trgm
+  ON gutenberg_catalog USING gin(title gin_trgm_ops);
+CREATE INDEX idx_gutenberg_catalog_author_trgm
+  ON gutenberg_catalog USING gin(author gin_trgm_ops);
+CREATE INDEX idx_gutenberg_catalog_popular
+  ON gutenberg_catalog(language, download_count DESC);
+```
+
+**字段说明：**
+- 数据来源：`pg_catalog.csv`，**一次性导入**，MVP 手动更新
+- 全文搜索：用 PostgreSQL `pg_trgm` 扩展做模糊匹配（标题/作者）
+- 热门排序：`ORDER BY download_count DESC`（古登堡自身记录）
+- 只保留 `zh` 和 `en` 两种语言，减小表大小
+
+**启用 trgm 扩展（在同一个 migration 文件）：**
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+```
+
+### 4.4 为什么用三表（catalog + books + gutenberg_books）
+
+| 表 | 角色 | 写入频率 |
+|---|---|---|
+| `gutenberg_catalog` | 全站共享的古登堡元数据池 | **每周一次**（手动或 cron） |
+| `books` | 用户的书（不变） | 用户导入/上传时 |
+| `gutenberg_books` | 1:1 关系，记录用户导入的古登堡书 | 用户导入时 |
+
+**优势：**
+- 7 万条目录数据**不重复存**（多用户搜索时共享）
+- 搜索是 `SELECT ... FROM gutenberg_catalog WHERE ...` — O(1) 网络，简单快速
+- catalog 更新不影响用户数据（gutenberg_books 仍然指向老的 gutenberg_id，但元数据已更新）
+
+### 4.5 唯一约束与查重
 
 **设计：**
 - `gutenberg_books` 唯一约束：`(book_id, gutenberg_id, language, format)` —— 同一用户、同一种语言版本只能存在一次
 - 业务含义：用户可以同时持有中英两版，或同一本书的 epub + txt 两个格式
 - 重复点击「加入书架」时：**通过 gutenberg_books JOIN books 查这个组合** → 命中则 toast「已在你的书架」并跳转；未命中则事务插入两表
 
-### 4.5 reading_progress / bookmarks / notes
+### 4.6 reading_progress / bookmarks / notes
 
 **完全复用现有表**，无变更。`book_id` 外键指向 `books.id`，无论对应的是 local 书还是 gutenberg 书。
 
@@ -232,11 +292,15 @@ CREATE POLICY "用户只能访问自己的古登堡书"
 
 | 文件 | 职责 |
 |------|------|
-| `supabase/functions/gutenberg-search/index.ts` | 搜索代理：调 Gutendex，过滤 zh/en |
-| `supabase/functions/gutenberg-import/index.ts` | 导入：拉元数据，事务写 books + gutenberg_books |
-| `supabase/functions/gutenberg-fetch/index.ts` | 阅读代理：内存缓存 + 整本代理下载 |
+| `supabase/functions/gutenberg-import/index.ts` | 导入：从 gutenberg_catalog 查元数据，事务写 books + gutenberg_books |
+| `supabase/functions/gutenberg-fetch/index.ts` | 阅读代理：内存缓存 + 整本代理下载（不再调 Gutendex） |
 | `supabase/functions/gutenberg-fetch/cache.ts` | 缓存 Map：`Map<gutenberg_id+format, {bytes, ts}>` |
+| `supabase/functions/gutenberg-sync/index.ts` | 手动触发同步：下载 pg_catalog.csv → 灌入 gutenberg_catalog |
 | `supabase/functions/tts/index.ts`（改） | TTS 新增 online 分支 |
+
+**变化说明：**
+- ❌ 删除原计划的 `gutenberg-search` Edge Function —— 搜索改为直接查 `gutenberg_catalog` 表（前端用 Supabase client 即可，无需 Edge Function）
+- ✅ 新增 `gutenberg-sync` Edge Function：手动触发 CSV 同步（管理员用）
 
 ### 5.3 复用现有
 
@@ -255,20 +319,27 @@ CREATE POLICY "用户只能访问自己的古登堡书"
 ```
 [用户输入"战争与和平"]
      ↓ (debounce 300ms)
-[useGutenbergSearch 调 gutenberg-search?q=战争与和平]
+[前端直接调 Supabase client]
      ↓
-[Edge Function 调 Gutendex API]
+[SQL: SELECT * FROM gutenberg_catalog
+       WHERE language='zh'
+       AND (title ILIKE '%战争与和平%' OR author ILIKE '%战争与和平%')
+       LIMIT 10]
      ↓
-[过滤 languages=zh,en + 排除无文件的结果]
-     ↓
-[返回最多 10 本]
+[pg_trgm 索引加速,本地查询 < 50ms]
      ↓
 [前端渲染 GutenbergBookCard 列表]
 ```
 
+**为什么不用 Edge Function 代理搜索？**
+- 搜索是**本地数据库查询**，零网络延迟
+- Supabase RLS 已保护数据（gutenberg_catalog 表是公开的，所有人可读）
+- 直接走 Supabase client 更简单，前端代码量更少
+- Edge Function 用于「有外部副作用的操作」（下载文件、事务写多表）
+
 **搜索源策略：**
-- 搜索时**同时发起**两个请求：本地公开书库 + 古登堡
-- 都在 5s 内超时，否则显示「该来源暂不可用」
+- 搜索时**同时发起**两个请求：本地公开书库 + gutenberg_catalog
+- 都在 1s 内返回（数据库查询）
 
 ### 6.2 导入流程
 
@@ -277,11 +348,11 @@ CREATE POLICY "用户只能访问自己的古登堡书"
      ↓
 [useGutenbergImport 检查登录态]
      ↓ 未登录 → toast "请先登录"
-[检查是否已导入：books JOIN gutenberg_books WHERE user_id=xxx AND gutenberg_id=xxx AND language=xxx]
+[检查是否已导入：gutenberg_books JOIN books WHERE user_id=xxx AND gutenberg_id=xxx AND language=xxx AND format IS NULL]
      ↓ 已存在 → toast "已在你的书架" + 跳转 /library?tab=online
 [调 gutenberg-import { gutenberg_id, language }]
      ↓
-[Edge Function 从 Gutendex 拉元数据（标题、作者、封面 URL）]
+[Edge Function 从 gutenberg_catalog 表查元数据（标题、作者、封面 URL）]
      ↓
 [开始数据库事务]
   ├─ INSERT INTO books (user_id, title, author, cover_url, file_url=NULL, file_type='gutenberg')
@@ -462,20 +533,22 @@ Edge Function 单实例默认 256MB 内存。
 
 ## 13. 实现清单（给 writing-plans 用）
 
-1. 数据库迁移：创建 `gutenberg_books` 表 + 索引 + RLS
-2. Edge Function：`gutenberg-search`
-3. Edge Function：`gutenberg-import`（事务写 books + gutenberg_books）
-4. Edge Function：`gutenberg-fetch` + `cache.ts`
-5. Edge Function：`tts` 加 online 分支
-6. 前端：`GutenbergBookCard.vue`
-7. 前端：`useGutenbergSearch.ts` + `useGutenbergImport.ts`
-8. 前端：`Search.vue` 加古登堡分组
-9. 前端：`Library.vue` 加 tab（查询带 JOIN/NOT IN）
-10. 前端：`Reader.vue` 加在线图书分支（检测 gutenberg_books 存在）
-11. 环境变量 + Vercel 配置
-12. 关于页加古登堡致谢
-13. 手测清单执行 + 截图归档
-14. 部署上线
+1. 下载 `pg_catalog.csv` 到本地，提取字段映射
+2. 数据库迁移 018：`gutenberg_books` 表 + 索引 + RLS + `gutenberg_catalog` 表 + 索引
+3. 导入脚本：本地脚本读 CSV → INSERT 到 `gutenberg_catalog`（zh + en 过滤）
+4. Edge Function：`gutenberg-import`（事务写 books + gutenberg_books）
+5. Edge Function：`gutenberg-fetch` + `cache.ts`（整本代理 + 内存缓存）
+6. Edge Function：`gutenberg-sync`（手动触发 CSV 同步）
+7. Edge Function：`tts` 加 online 分支
+8. 前端：`GutenbergBookCard.vue`
+9. 前端：`useGutenbergSearch.ts` + `useGutenbergImport.ts`（搜索走 Supabase client）
+10. 前端：`Search.vue` 加古登堡分组
+11. 前端：`Library.vue` 加 tab（查询带 JOIN/NOT IN）
+12. 前端：`Reader.vue` 加在线图书分支（检测 gutenberg_books 存在）
+13. 环境变量 + Vercel 配置
+14. 关于页加古登堡致谢
+15. 手测清单执行 + 截图归档
+16. 部署上线
 
 ---
 

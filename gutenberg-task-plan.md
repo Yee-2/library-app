@@ -8,12 +8,26 @@
 
 ## 数据模型总览
 - **books 表**：零改动，所有现有用户上传书继续使用
-- **gutenberg_books 新表**：1:1 关系，PK = FK → books.id
+- **gutenberg_books 新表**：1:1 关系，PK = FK → books.id（用户导入记录）
+- **gutenberg_catalog 新表**：全站共享的古登堡元数据池（约 7 万本 zh+en）
 - **reading_progress / bookmarks / notes**：零改动，复用现有 book_id
+
+## 数据源策略调整（重要）
+
+⚠️ 原计划使用 [Gutendex](https://gutendex.com) API，**实测发现不可用**：
+- Cloudflare 反爬虫（HTTP 403）
+- robots.txt 禁止 `/books/` 路径
+- robots.txt 明确禁止 ClaudeBot/GPTBot 等 AI 爬虫
+
+✅ **调整为古登堡官方方案：**
+- 一次性下载 `pg_catalog.csv` 到 Supabase `gutenberg_catalog` 表
+- 搜索完全本地（PostgreSQL `pg_trgm` 模糊匹配）
+- 文件下载走 `gutenberg.org/cache/epub/{id}/pg{id}-images-3.epub`
+- 古登堡 [robot policy](https://www.gutenberg.org/policy/robot_access.html) 明确允许
 
 ## 实现策略
 按 4 个阶段顺序实施，每个阶段独立可交付、单独合并 PR：
-- 阶段 1：基础设施（DB + 后端 Edge Functions）
+- 阶段 1：基础设施（DB + CSV 导入脚本 + 后端 Edge Functions）
 - 阶段 2：搜索 + 导入（前端主要功能）
 - 阶段 3：在线阅读（最复杂）
 - 阶段 4：TTS + 收尾
@@ -22,51 +36,75 @@
 
 ## 阶段 1：基础设施 [todo]
 
-**目标：** DB 新表 + 3 个后端 Edge Function 上线（搜索 / 导入 / 拉取）
+**目标：** DB 新表 + CSV 导入 + 3 个后端 Edge Function 上线（导入 / 拉取 / 同步）
+
+### 1.0 下载 pg_catalog.csv + 字段映射
+
+- [ ] 用 curl 下载 `https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv` 到本地（保存为 `scripts/pg_catalog.csv`）
+- [ ] 用 `head -5 scripts/pg_catalog.csv` 检查列结构
+- [ ] 记录字段映射（CSV 列 → DB 列）：
+  - `id` → `gutenberg_id` (INT)
+  - `title` → `title` (TEXT)
+  - `authors` → `author`（多个作者用 `; ` 分隔）
+  - `language` → `language` (CHAR(2))
+  - `downloads` → `download_count` (INT)
+  - 解析 `formats` JSON 字段提取 `application/epub+zip` URL → `epub_url`
+  - 解析 `formats` JSON 字段提取 `text/plain; charset=utf-8` URL → `txt_url`
+  - 解析 `formats` JSON 字段提取 `image/jpeg` URL → `cover_url`（部分书有）
 
 ### 1.1 数据库迁移
 
-- [ ] 创建 migration 文件 `supabase/migrations/YYYYMMDD_gutenberg_books.sql`
+- [ ] 创建 migration 文件 `supabase/migrations/018_gutenberg.sql`（合并 gutenberg_books + gutenberg_catalog 两张表）
+- [ ] `CREATE EXTENSION IF NOT EXISTS pg_trgm`（用于全文模糊搜索）
 - [ ] `CREATE TABLE gutenberg_books` （含 book_id PK+FK、4 字段、CHECK 约束）
 - [ ] `CREATE INDEX idx_gutenberg_id ON gutenberg_books(gutenberg_id)`
 - [ ] `CREATE INDEX idx_gutenberg_user_lang ON gutenberg_books(book_id, language)`
 - [ ] `ALTER TABLE gutenberg_books ENABLE ROW LEVEL SECURITY`
 - [ ] 创建 RLS policy：「用户只能访问自己的古登堡书」通过 JOIN books 验证 user_id
+- [ ] `CREATE TABLE gutenberg_catalog`（含 gutenberg_id PK、8 字段、CHECK 约束 language IN ('zh','en')）
+- [ ] `CREATE INDEX idx_gutenberg_catalog_lang ON gutenberg_catalog(language)`
+- [ ] `CREATE INDEX idx_gutenberg_catalog_title_trgm USING gin(title gin_trgm_ops)`
+- [ ] `CREATE INDEX idx_gutenberg_catalog_author_trgm USING gin(author gin_trgm_ops)`
+- [ ] `CREATE INDEX idx_gutenberg_catalog_popular ON gutenberg_catalog(language, download_count DESC)`
+- [ ] **gutenberg_catalog 表不启用 RLS**（公开数据，全员可读，参考 books 的 is_public 模式）
 - [ ] 迁移应用到本地 Supabase 实例
 - [ ] 验证：现有 books 数据完全不受影响
 
-### 1.2 Edge Function: gutenberg-search
+### 1.2 CSV 导入脚本（一次性任务）
 
-- [ ] `supabase/functions/gutenberg-search/index.ts` 新建
-- [ ] 入参校验：`{ q: string, page?: number }`，q 非空
-- [ ] 调 Gutendex: `https://gutendex.com/books/?search={q}&languages=zh,en&page={page}`
-- [ ] 5 秒超时控制
-- [ ] 标准化返回：每本书返回 `{ gutenberg_id, title, author, language, cover_url, formats: { epub, txt, ... } }`
-- [ ] 排除无任何可下载格式的结果
-- [ ] 错误处理：Gutendex 失败 → 返回 `{ error: 'gutenberg_unavailable' }`，HTTP 503
-- [ ] 本地测试：`supabase functions serve gutenberg-search`
+- [ ] 创建 `scripts/import_gutenberg_catalog.mjs`（Node.js 脚本）
+- [ ] 读 `scripts/pg_catalog.csv`
+- [ ] 过滤 `language IN ('zh', 'en')`
+- [ ] 用 `pg` npm 包或 Supabase 批量 INSERT 到 `gutenberg_catalog`
+- [ ] 进度日志：每 1000 条打印一次
+- [ ] 去重：`ON CONFLICT (gutenberg_id) DO UPDATE` 保证幂等
+- [ ] 本地运行：确认导入约 1000 本中文 + 60000+ 本英文
+- [ ] 验证：`SELECT count(*), language FROM gutenberg_catalog GROUP BY language`
 
 ### 1.3 Edge Function: gutenberg-import
 
 - [ ] `supabase/functions/gutenberg-import/index.ts` 新建
 - [ ] 鉴权：必须登录（Supabase JWT）
 - [ ] 入参校验：`{ gutenberg_id: int, language: 'zh'|'en' }`
-- [ ] 调 Gutendex 拉元数据（`https://gutendex.com/books/{id}`）
-- [ ] 提取 title, authors[], cover 链接
+- [ ] **从 gutenberg_catalog 表查元数据**（不再调 Gutendex）：
+  ```
+  SELECT title, author, cover_url FROM gutenberg_catalog
+  WHERE gutenberg_id=? AND language=?
+  ```
 - [ ] **查重**：`SELECT b.id FROM books b JOIN gutenberg_books gb ON b.id=gb.book_id WHERE b.user_id=auth.uid() AND gb.gutenberg_id=? AND gb.language=? AND gb.format IS NULL`
   - 命中 → 返回 `{ exists: true, book_id }`，HTTP 200
 - [ ] **事务写两表**：
   ```
   BEGIN
-    INSERT INTO books (user_id, title, author, cover_url, file_url, file_type, ...)
+    INSERT INTO books (user_id, title, author, cover_url, file_url=NULL, file_type='gutenberg', ...)
       VALUES (auth.uid(), ?, ?, ?, NULL, 'gutenberg', ...)
     INSERT INTO gutenberg_books (book_id, gutenberg_id, language, format=NULL)
-      VALUES (currval('books_id_seq'), ?, ?)
+      VALUES (?, ?, ?)
   COMMIT
   ```
-- [ ] 错误处理：Gutendex 404 → HTTP 404 + `{ error: 'not_found' }`
+- [ ] 错误处理：catalog 找不到 → HTTP 404 + `{ error: 'not_found' }`
 - [ ] 错误处理：事务失败 → ROLLBACK + HTTP 500
-- [ ] 本地测试：mock 一个 JWT + 调真实 Gutendex
+- [ ] 本地测试：用本地 JWT + 真实 gutenberg_id 验证
 
 ### 1.4 Edge Function: gutenberg-fetch（含 cache.ts）
 
@@ -79,20 +117,35 @@
 - [ ] 流程：
   1. 入参 `{ book_id }`
   2. SQL: `SELECT gb.gutenberg_id, gb.language, gb.format FROM gutenberg_books gb JOIN books b ON gb.book_id=b.id WHERE gb.book_id=? AND b.user_id=auth.uid()`
-  3. 若 `format` 为 NULL → 调 Gutendex 选 epub，UPDATE gutenberg_books.format='epub'
-  4. 构造 cache key = `${gutenberg_id}:${format}`
-  5. 查缓存：命中 → 返回 base64
-  6. 未命中 → 选下载 URL（epub 优先 `https://www.gutenberg.org/cache/epub/{id}/pg{id}.epub`）
-  7. fetch 下载（10s 超时）
-  8. 写入缓存
-  9. 返回 base64 + content-type
+  3. 若 `format` 为 NULL → 默认选 epub，UPDATE gutenberg_books.format='epub'
+  4. SQL: `SELECT epub_url, txt_url FROM gutenberg_catalog WHERE gutenberg_id=? AND language=?`
+  5. 选下载 URL（epub 优先：`https://www.gutenberg.org/cache/epub/{id}/pg{id}-images-3.epub`）
+  6. 构造 cache key = `${gutenberg_id}:${format}`
+  7. 查缓存：命中 → 返回 base64
+  8. 未命中 → 从 gutenberg.org 下载（10s 超时）
+  9. 写入缓存
+  10. 返回 base64 + content-type
 - [ ] 错误处理：book_id 不属于当前用户 → 403
+- [ ] 错误处理：catalog 找不到文件 URL → 404
 - [ ] 错误处理：下载失败 → 502 + `{ error: 'fetch_failed' }`
 - [ ] 本地测试：导入一本后调 fetch 验证
 
-### 1.5 阶段 1 验证
+### 1.5 Edge Function: gutenberg-sync（手动同步）
+
+- [ ] `supabase/functions/gutenberg-sync/index.ts` 新建
+- [ ] 鉴权：必须登录 + 是管理员（白名单 user_id 或专用 service role key）
+- [ ] 流程：
+  1. fetch `https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv`（30s 超时）
+  2. 解析 CSV（流式处理，7 万行不能一次加载）
+  3. 过滤 `language IN ('zh', 'en')`
+  4. 批量 UPSERT 到 gutenberg_catalog（每 500 行一批）
+  5. 返回 `{ synced: number, languages: { zh: N, en: N } }`
+- [ ] 本地测试：手动调一次 sync 验证
+
+### 1.6 阶段 1 验证
 
 - [ ] 迁移脚本在本地 Supabase 跑通
+- [ ] CSV 导入脚本跑通，gutenberg_catalog 有约 60000+ 英文 + 1000+ 中文
 - [ ] 3 个 Edge Function 都本地部署并能 curl 测试
 - [ ] 没有现有功能被破坏
 
@@ -107,7 +160,16 @@
 - [ ] `src/composables/useGutenbergSearch.ts` 新建
 - [ ] 导出 `useGutenbergSearch()`
 - [ ] 返回 `{ results, loading, error, search }`
-- [ ] `search(q)` 调用 `supabase.functions.invoke('gutenberg-search', { body: { q } })`
+- [ ] `search(q)` 直接调 Supabase client（不走 Edge Function）：
+  ```ts
+  const { data } = await supabase
+    .from('gutenberg_catalog')
+    .select('gutenberg_id, title, author, language, cover_url, download_count')
+    .eq('language', lang)  // 'zh' 或 'en' 根据查询自动判断
+    .or(`title.ilike.%${q}%,author.ilike.%${q}%`)
+    .order('download_count', { ascending: false })
+    .limit(10)
+  ```
 - [ ] 防抖 300ms（外部实现，composable 不管）
 - [ ] 错误时清空 results
 
