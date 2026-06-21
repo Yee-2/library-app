@@ -30,6 +30,9 @@ supabase/supabase/
 supabase.exe
 supabase-go.exe
 
+# downloaded tools (deploy script downloads supabase CLI here)
+tools/
+
 # scripts
 scripts/pg_catalog.csv
 scripts/*.test.mjs

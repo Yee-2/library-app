@@ -190,6 +190,71 @@ SELECT language, count(*) FROM gutenberg_catalog GROUP BY language;
 
 古登堡目录每周更新，建议每月跑一次 `gutenberg-sync` 拉取最新元数据。可手动跑，也可在 Edge Function 里加 cron 触发（后续优化）。
 
+## 二·六、一键部署脚本
+
+> 嫌手动敲命令烦？用 PowerShell 脚本一次走完：下载 CLI → 登录 → 链接 → 迁移 → 部署 → 同步。
+
+### 用法
+
+```powershell
+# 在项目根目录
+powershell -ExecutionPolicy Bypass -File scripts/deploy_gutenberg.ps1 `
+  -ProjectRef 你的项目ref `
+  -AdminUserIds "你的user_uuid1,你的user_uuid2"
+```
+
+### 必需参数
+
+| 参数 | 说明 | 示例 |
+|---|---|---|
+| `-ProjectRef` | Supabase 项目 ref | `abcdefghij` |
+| `-AdminUserIds` | 管理员 user_id（逗号分隔） | `a1b2c3d4-...,e5f6g7h8-...` |
+
+### 可选参数
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `-CliVersion` | `2.107.0` | Supabase CLI 版本 |
+| `-SkipMigration` | false | 跳过数据库迁移（需手动在 SQL Editor 执行） |
+| `-SkipSync` | false | 跳过首次目录同步 |
+| `-Force` | false | 强制重新下载 CLI |
+
+### 脚本会做的事
+
+1. 下载 Supabase CLI 到 `tools/supabase.exe`（如果不存在）
+2. 检查登录状态，未登录会打开浏览器
+3. 链接到指定项目
+4. **可选**：用 psql 执行 `supabase/migrations/018_gutenberg.sql`
+5. 部署 3 个 Edge Functions（gutenberg-import / -fetch / -sync）
+6. 设置 `ADMIN_USER_IDS` secret
+7. **可选**：用你的 admin token 触发 `gutenberg-sync` 首次同步
+8. 列出已部署的 gutenberg-* 函数
+
+### 失败处理
+
+- **下载 CLI 失败**：国内网络可能访问 GitHub 慢，可设置 `http_proxy` 环境变量后重试
+- **psql 未安装**：脚本会跳过迁移并提示手动在 Supabase SQL Editor 执行
+- **admin token 失效**：跳过同步步骤，部署后手动跑：
+  ```bash
+  curl -X POST -H "Authorization: Bearer 你的新token" \
+    https://你的项目.supabase.co/functions/v1/gutenberg-sync
+  ```
+
+### 完整示例
+
+```powershell
+# 第一次部署：完整流程
+powershell -ExecutionPolicy Bypass -File scripts/deploy_gutenberg.ps1 `
+  -ProjectRef abcdefghij `
+  -AdminUserIds "550e8400-e29b-41d4-a716-446655440000"
+
+# 只重新部署函数（跳过迁移和同步）
+powershell -ExecutionPolicy Bypass -File scripts/deploy_gutenberg.ps1 `
+  -ProjectRef abcdefghij `
+  -AdminUserIds "550e8400-e29b-41d4-a716-446655440000" `
+  -SkipMigration -SkipSync
+```
+
 ---
 
 ## 三、配置并部署前端到 Vercel
