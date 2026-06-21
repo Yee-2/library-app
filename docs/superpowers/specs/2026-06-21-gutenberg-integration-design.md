@@ -67,6 +67,12 @@
 │  │  Library.vue (书架页)                              │  │
 │  │  ┌──────────────────────────────────────────────┐  │  │
 │  │  │ Tabs: [我的书架] [在线图书]                  │  │  │
+│  │  │  - 我的书架: SELECT * FROM books              │  │  │
+│  │  │    WHERE user_id=xxx AND id NOT IN            │  │  │
+│  │  │    (SELECT book_id FROM gutenberg_books)      │  │  │
+│  │  │  - 在线图书: SELECT b.* FROM books b          │  │  │
+│  │  │    JOIN gutenberg_books gb ON b.id=gb.book_id │  │  │
+│  │  │    WHERE b.user_id=xxx                        │  │  │
 │  │  └──────────────────────────────────────────────┘  │  │
 │  └────────────────────────────────────────────────────┘  │
 │                                                          │
@@ -105,13 +111,13 @@
 │  │  POST /functions/v1/gutenberg-import              │  │
 │  │  - 入参：{ gutenberg_id: number }                 │  │
 │  │  - 调用 Gutendex 拉元数据                          │  │
-│  │  - 写入 books 表（storage_type=gutenberg）        │  │
+│  │  - 事务:INSERT books → INSERT gutenberg_books        │  │
 │  │  - 返回：book_id                                  │  │
 │  └────────────────────────────────────────────────────┘  │
 │                                                          │
 │  ┌────────────────────────────────────────────────────┐  │
 │  │  GET /functions/v1/gutenberg-fetch?book_id=xxx    │  │
-│  │  - book_id → 查 books 表取 gutenberg_id+format   │  │
+│  │  - book_id → 查 gutenberg_books 取 gutenberg_id+format   │  │
 │  │  - 查内存缓存：命中 → 直接返回                    │  │
 │  │  - 未命中：代理下载整本 → 写入缓存 → 返回 base64  │  │
 │  │  - 缓存：Map<gutenberg_id+format, {bytes, ts}>    │  │
@@ -137,47 +143,75 @@
 
 ## 4. 数据模型变更
 
-### 4.1 books 表（迁移）
+### 4.1 books 表（**无变更**）
 
-**新增字段：**
+保持现有结构完全不动。所有用户上传的书继续走 books 表，不受古登堡功能影响。
+
+### 4.2 新表：gutenberg_books
 
 ```sql
-ALTER TABLE books
-  ADD COLUMN storage_type TEXT NOT NULL DEFAULT 'local'
-    CHECK (storage_type IN ('local', 'gutenberg')),
-  ADD COLUMN gutenberg_id INTEGER,
-  ADD COLUMN gutenberg_format TEXT
-    CHECK (gutenberg_format IN ('epub', 'txt', NULL)),
-  ADD COLUMN gutenberg_language CHAR(2)
-    CHECK (gutenberg_language IN ('zh', 'en', NULL));
+CREATE TABLE gutenberg_books (
+  book_id INT PRIMARY KEY
+    REFERENCES books(id) ON DELETE CASCADE,
+  gutenberg_id INT NOT NULL,
+  language CHAR(2) NOT NULL
+    CHECK (language IN ('zh', 'en')),
+  format TEXT
+    CHECK (format IN ('epub', 'txt')),
+  imported_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
--- 索引
-CREATE INDEX idx_books_storage_type ON books(user_id, storage_type);
-CREATE INDEX idx_books_user_gutenberg ON books(user_id, gutenberg_id)
-  WHERE gutenberg_id IS NOT NULL;
-CREATE UNIQUE INDEX uniq_books_user_gutenberg_format_lang
-  ON books(user_id, gutenberg_id, gutenberg_language, gutenberg_format)
-  WHERE gutenberg_id IS NOT NULL;
+  -- 一致性：每本书只能对应一个 (gutenberg_id, language, format) 组合
+  CONSTRAINT uniq_gutenberg_per_user_format
+    UNIQUE (book_id, gutenberg_id, language, format)
+);
+
+-- 加速「查重」查询
+CREATE INDEX idx_gutenberg_id ON gutenberg_books(gutenberg_id);
+
+-- 加速「查用户所有古登堡书」
+CREATE INDEX idx_gutenberg_user_lang
+  ON gutenberg_books(book_id, language);
+
+-- RLS：用户只能看到自己导入的古登堡书
+ALTER TABLE gutenberg_books ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "用户只能访问自己的古登堡书"
+  ON gutenberg_books FOR ALL
+  USING (
+    book_id IN (SELECT id FROM books WHERE user_id = auth.uid())
+  );
+
+-- 通过 books.id 关联,自动继承 books 的 RLS
 ```
 
-**说明：**
-- `storage_type = 'local'`：用户上传的书（现有数据全部保持不变）
-- `storage_type = 'gutenberg'`：从古登堡导入的书
-- `gutenberg_id`：古登堡内部 ID（全局唯一，跨用户不重复，所以 user_id + gutenberg_id 必须唯一）
-- `gutenberg_format`：用户首次点开阅读时**自动选择**（古登堡一本书通常提供 epub + txt，优先 epub），存到 books 表供后续复用
-- `gutenberg_language`：zh / en，用于前端筛选和展示
+**字段说明：**
+- `book_id`：**同时是主键和外键**，对应 books 表里的那条记录（FK ON DELETE CASCADE）
+- `gutenberg_id`：古登堡内部 ID（跨用户可重复）
+- `language`：zh / en
+- `format`：用户首次阅读时**自动选择**（古登堡一本书通常提供 epub + txt，优先 epub），存到这里供后续复用
+- `imported_at`：导入时间
 
-### 4.2 books 表唯一约束
+### 4.3 为什么用双表 1:1 而不是 books 加字段
+
+| 维度 | books 加字段 | **双表 1:1（采用）** |
+|------|------------|---------------------|
+| books 表改动 | 4 个字段 + 索引 | **零改动** |
+| reading_progress / bookmarks / notes 改动 | 无 | **无** |
+| 未来扩展（如下载次数、缓存命中） | 全部塞 books 表 | **独立 gutenberg_books 表** |
+| 字段语义污染 | local 书多了 4 个无意义字段 | **彻底隔离** |
+| 导入复杂度 | INSERT 1 行 | INSERT 2 行（事务） |
+| 回滚成本 | DROP 4 列 | DROP 1 张表 |
+
+### 4.4 唯一约束与查重
 
 **设计：**
-- `gutenberg_id` 本身**不唯一**（多用户可导入同一本）
-- 唯一约束：`(user_id, gutenberg_id, gutenberg_language, gutenberg_format)` —— 同一用户的「中文 EPUB 版」只能存在一次
+- `gutenberg_books` 唯一约束：`(book_id, gutenberg_id, language, format)` —— 同一用户、同一种语言版本只能存在一次
 - 业务含义：用户可以同时持有中英两版，或同一本书的 epub + txt 两个格式
-- 重复点击「加入书架」时：**先查这个组合** → 命中则 toast「已在你的书架」并跳转；未命中则插入
+- 重复点击「加入书架」时：**通过 gutenberg_books JOIN books 查这个组合** → 命中则 toast「已在你的书架」并跳转；未命中则事务插入两表
 
-### 4.3 reading_progress / bookmarks / notes
+### 4.5 reading_progress / bookmarks / notes
 
-**完全复用现有表**，无变更。`book_id` 外键指向 `books.id`，无论 storage_type 是什么。
+**完全复用现有表**，无变更。`book_id` 外键指向 `books.id`，无论对应的是 local 书还是 gutenberg 书。
 
 ---
 
@@ -199,9 +233,9 @@ CREATE UNIQUE INDEX uniq_books_user_gutenberg_format_lang
 | 文件 | 职责 |
 |------|------|
 | `supabase/functions/gutenberg-search/index.ts` | 搜索代理：调 Gutendex，过滤 zh/en |
-| `supabase/functions/gutenberg-import/index.ts` | 导入：拉元数据，写 books 表 |
+| `supabase/functions/gutenberg-import/index.ts` | 导入：拉元数据，事务写 books + gutenberg_books |
 | `supabase/functions/gutenberg-fetch/index.ts` | 阅读代理：内存缓存 + 整本代理下载 |
-| `supabase/functions/gutenberg-fetch/cache.ts` | 缓存 Map：`Map<gutenberg_id, {bytes, format, ts}>` |
+| `supabase/functions/gutenberg-fetch/cache.ts` | 缓存 Map：`Map<gutenberg_id+format, {bytes, ts}>` |
 | `supabase/functions/tts/index.ts`（改） | TTS 新增 online 分支 |
 
 ### 5.3 复用现有
@@ -243,13 +277,16 @@ CREATE UNIQUE INDEX uniq_books_user_gutenberg_format_lang
      ↓
 [useGutenbergImport 检查登录态]
      ↓ 未登录 → toast "请先登录"
-[检查是否已导入：(user_id, gutenberg_id) 是否存在]
-     ↓ 已存在 → toast "已在你的书架" + 跳转 /library
-[调 gutenberg-import { gutenberg_id }]
+[检查是否已导入：books JOIN gutenberg_books WHERE user_id=xxx AND gutenberg_id=xxx AND language=xxx]
+     ↓ 已存在 → toast "已在你的书架" + 跳转 /library?tab=online
+[调 gutenberg-import { gutenberg_id, language }]
      ↓
-[Edge Function 从 Gutendex 拉元数据（标题、作者、封面 URL、语言）]
+[Edge Function 从 Gutendex 拉元数据（标题、作者、封面 URL）]
      ↓
-[写入 books 表：storage_type='gutenberg', gutenberg_id, language, format=null]
+[开始数据库事务]
+  ├─ INSERT INTO books (user_id, title, author, cover_url, file_url=NULL, file_type='gutenberg')
+  └─ INSERT INTO gutenberg_books (book_id, gutenberg_id, language, format=NULL)
+[COMMIT]
      ↓
 [返回新 book_id]
      ↓
@@ -261,11 +298,14 @@ CREATE UNIQUE INDEX uniq_books_user_gutenberg_format_lang
 ```
 [用户点击在线图书]
      ↓
-[Reader.vue 检测到 storage_type='gutenberg']
+[Reader.vue 加载 book_id → 查 books JOIN gutenberg_books]
+     ↓ 检测到 gutenberg_books 记录存在 → 这是古登堡书
      ↓
 [调用 gutenberg-fetch?book_id={id}]
      ↓
-[Edge Function 用 book_id 查 books 表取 gutenberg_id+format]
+[Edge Function 用 book_id 查 gutenberg_books 取 gutenberg_id+format]
+  ├─ format 已选（如 epub）→ 直接用
+  └─ format NULL（首次阅读）→ 默认选 epub，更新 gutenberg_books.format
      ↓
 [Edge Function 查缓存 Map<gutenberg_id+format, ...>]
    ├─ 命中 → 直接返回 base64
@@ -281,7 +321,7 @@ CREATE UNIQUE INDEX uniq_books_user_gutenberg_format_lang
 ```
 [用户点击听书]
      ↓
-[Reader.vue 检测 storage_type='gutenberg' → 传 source='online' 给 TTS API]
+[Reader.vue 检测到 gutenberg_books 记录存在 → 传 source='online' 给 TTS API]
      ↓
 [TTS Edge Function 检测 source='online']
      ↓
@@ -390,9 +430,9 @@ Edge Function 单实例默认 256MB 内存。
 
 ### 11.1 数据库迁移
 
-- 新增 3 个字段：`storage_type`, `gutenberg_id`, `gutenberg_format`, `gutenberg_language`
-- 现有数据全部默认 `storage_type='local'`，无破坏性变更
-- 迁移可逆：DROP COLUMN 即可
+- **新增一张表** `gutenberg_books`（无破坏性变更）
+- books 表完全不动，所有现有数据保持原状
+- 迁移可逆：`DROP TABLE gutenberg_books CASCADE` 即可
 
 ### 11.2 代码回滚
 
@@ -422,16 +462,16 @@ Edge Function 单实例默认 256MB 内存。
 
 ## 13. 实现清单（给 writing-plans 用）
 
-1. 数据库迁移：books 表加 4 个字段 + 2 个索引
+1. 数据库迁移：创建 `gutenberg_books` 表 + 索引 + RLS
 2. Edge Function：`gutenberg-search`
-3. Edge Function：`gutenberg-import`
+3. Edge Function：`gutenberg-import`（事务写 books + gutenberg_books）
 4. Edge Function：`gutenberg-fetch` + `cache.ts`
 5. Edge Function：`tts` 加 online 分支
 6. 前端：`GutenbergBookCard.vue`
 7. 前端：`useGutenbergSearch.ts` + `useGutenbergImport.ts`
 8. 前端：`Search.vue` 加古登堡分组
-9. 前端：`Library.vue` 加 tab
-10. 前端：`Reader.vue` 加在线图书分支
+9. 前端：`Library.vue` 加 tab（查询带 JOIN/NOT IN）
+10. 前端：`Reader.vue` 加在线图书分支（检测 gutenberg_books 存在）
 11. 环境变量 + Vercel 配置
 12. 关于页加古登堡致谢
 13. 手测清单执行 + 截图归档
@@ -450,7 +490,7 @@ Edge Function 单实例默认 256MB 内存。
 | 缓存 TTL | 不设置 | 1h / 24h | 用户决策，简单优先 |
 | 书架区分 | tab 分类 | badge / 点击后提示 | 可发现性最强，实现简单 |
 | TTS 支持 | 复用现有 | 古登堡不支持听书 | 体验一致性 |
-| 进度存储 | books 加字段 | 新表 / 复用 | 业务上是同一本书 |
+| 进度存储 | 双表 1:1（gutenberg_books 独立） | books 加字段 | books 零改动，扩展性最强 |
 
 ---
 
@@ -460,7 +500,7 @@ Edge Function 单实例默认 256MB 内存。
 |------|------|------|
 | 古登堡服务器不可达（国内网络） | 中 | 加 5s 超时，友好错误提示；后续可加 Cloudflare 镜像代理 |
 | Edge Function 内存溢出 | 低 | 单本书 > 50MB 拒绝；LRU 清理 |
-| 用户重复导入 | 低 | (user_id, gutenberg_id) 查重 |
+| 用户重复导入 | 低 | books JOIN gutenberg_books 按 (book_id, gutenberg_id, language, format) 查重 |
 | 古登堡版权争议 | 极低 | 公有领域已明确，添加致谢；不下载到 Storage 进一步降低风险 |
 | Gutendex API 变更 | 低 | 单文件封装 `gutendex-api.ts`，变更只影响一处 |
 | 用户期望「能离线读古登堡书」 | 中 | UI 上明确「在线图书」tab 区分；后续可加「导入到本地」功能 |
