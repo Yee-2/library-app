@@ -48,19 +48,28 @@ function onBookClick(id: string) {
   <div>
     <!-- Hero -->
     <section class="bg-gradient-to-br from-primary-600 via-primary-700 to-accent-600 text-white relative overflow-hidden">
-      <div class="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-white/10 blur-3xl" />
-      <div class="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-white/10 blur-3xl" />
-      <div class="max-w-3xl mx-auto px-4 py-10 sm:py-14 text-center relative">
-        <h1 class="text-3xl sm:text-4xl font-bold mb-2 tracking-tight ">云端图书馆</h1>
-        <p class="text-sm sm:text-base text-white/85 mb-6">自定义导入 · 多端同步 · AI 听书 · 读者社区</p>
+      <div class="absolute top-0 right-0 w-64 h-64 rounded-full bg-white/5 blur-3xl translate-x-1/3 -translate-y-1/3" />
+      <div class="absolute bottom-0 left-0 w-48 h-48 rounded-full bg-white/5 blur-3xl -translate-x-1/4 translate-y-1/4" />
+      <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 w-[200%] h-12 rounded-[50%] bg-white/5" />
+      <div class="max-w-3xl mx-auto px-4 py-12 sm:py-16 text-center relative">
+        <h1 class="text-4xl sm:text-5xl font-bold mb-2 tracking-tight">书屿</h1>
+        <p class="text-base sm:text-lg text-white/80 mb-1 font-serif tracking-wide">书海一屿，随心而读</p>
+        <p class="text-xs sm:text-sm text-white/60 mb-6">自定义导入 · 多端同步 · AI 听书</p>
         <div
           @click="router.push('/search')"
           class="relative w-full max-w-md mx-auto cursor-pointer"
         >
           <Search class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-300" :stroke-width="1.75" />
-          <div class="w-full h-11 pl-11 pr-4 rounded-full bg-white/95 text-sm text-slate-700 flex items-center shadow-lg hover:bg-white transition">
-            搜书名、作者、关键词…
+          <div class="w-full h-11 pl-11 pr-4 rounded-full bg-white/95 text-sm text-slate-500 flex items-center shadow-lg hover:bg-white transition">
+            搜书名、作者，探索 7 万+ 公版好书…
           </div>
+        </div>
+        <div class="flex items-center justify-center gap-4 mt-3 text-xs text-white/50">
+          <span>古登堡计划 · 7 万+ 英文</span>
+          <span class="w-1 h-1 rounded-full bg-white/30" />
+          <span>维基文库 · 中文公版</span>
+          <span class="w-1 h-1 rounded-full bg-white/30" />
+          <span>用户分享书库</span>
         </div>
       </div>
     </section>

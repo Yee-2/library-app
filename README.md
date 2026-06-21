@@ -1,4 +1,4 @@
-# 云端图书馆 (Cloud Library)
+# 书屿 (Shu Yu)
 
 一个**完全免费**的全栈 H5 阅读应用，支持自定义导入图书、多端同步、AI 听书。
 
@@ -70,7 +70,7 @@ npm run dev
 ```
 VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGc...
-VITE_APP_NAME=云端图书馆
+VITE_APP_NAME=书屿
 ```
 
 ### Supabase Edge Function 环境变量

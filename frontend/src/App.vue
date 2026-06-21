@@ -79,7 +79,7 @@ onBeforeUnmount(() => {
       <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
         <RouterLink to="/" class="flex items-center gap-2 text-ink-800 font-semibold tracking-tight">
           <img src="/favicon.svg" class="w-7 h-7 drop-shadow-lg" alt="logo" />
-          <span class="hidden sm:inline text-primary-700">云端图书馆</span>
+          <span class="hidden sm:inline text-primary-700">书屿</span>
         </RouterLink>
 
         <nav class="flex items-center gap-1 text-sm">
@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
     <ToastHost />
 
     <footer v-if="!showTabBar" class="border-t border-primary-100 py-5 text-center text-xs text-ink-300">
-      © {{ new Date().getFullYear() }} 云端图书馆 · Powered by Supabase + Vercel
+      © {{ new Date().getFullYear() }} 书屿 · Powered by Supabase + Vercel
     </footer>
   </div>
 </template>

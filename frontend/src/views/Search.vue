@@ -165,7 +165,7 @@ const showPublicSection = computed(() => results.value.length > 0)
       <input
         v-model="q"
         @input="doSearch"
-        placeholder="输入书名、作者、简介关键词…"
+        placeholder="搜书名、作者，古登堡 + 维基文库 + 公开书库…"
         class="input pl-10"
         autofocus
       />

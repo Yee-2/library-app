@@ -1,7 +1,7 @@
 {
-  "name": "云端图书馆",
-  "short_name": "图书馆",
-  "description": "云端图书馆 - 自定义导入、跨端阅读、AI 听书",
+  "name": "书屿",
+  "short_name": "书屿",
+  "description": "书屿 - 自定义导入、跨端阅读、AI 听书",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8fafc",

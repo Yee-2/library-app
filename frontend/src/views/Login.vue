@@ -68,7 +68,7 @@ function goRedirect() {
         <div class="inline-flex w-16 h-16 rounded-3xl bg-gradient-to-br from-primary-600 to-accent-600 items-center justify-center shadow-lg">
           <img src="/favicon.svg" class="w-9 h-9" alt="logo" />
         </div>
-        <h1 class="text-2xl font-bold mt-3 tracking-tight text-ink-900-50">云端图书馆</h1>
+        <h1 class="text-2xl font-bold mt-3 tracking-tight text-ink-900-50">书屿</h1>
         <p class="text-xs text-ink-300 mt-1">书山有路，与君共读</p>
       </div>
 

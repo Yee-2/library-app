@@ -278,7 +278,7 @@ powershell -ExecutionPolicy Bypass -File scripts/deploy_gutenberg.ps1 `
 |---|---|---|
 | `VITE_SUPABASE_URL` | `https://xxx.supabase.co` | Supabase Project URL |
 | `VITE_SUPABASE_ANON_KEY` | `eyJhbGc...` | Supabase anon public key |
-| `VITE_APP_NAME` | `云端图书馆` | （可选）应用名 |
+| `VITE_APP_NAME` | `书屿` | （可选）应用名 |
 | `VITE_ENABLE_GUTENBERG` | `true` | （可选）古登堡功能开关，默认 true；设为 `false` 隐藏相关 UI |
 
 > 注：Vite 的环境变量必须以 `VITE_` 开头才会暴露给前端。
