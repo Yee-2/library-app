@@ -258,7 +258,7 @@ if (highlightId.value) {
         <Wifi class="w-3.5 h-3.5" :stroke-width="2" />
         在线图书
         <span v-if="onlineBooks.length > 0" class="text-[10px] text-ink-300">· {{ onlineBooks.length }}</span>
-        <span class="text-[10px] text-emerald-600 ml-0.5">· 古登堡</span>
+        <span class="text-[10px] text-emerald-600 ml-0.5">· 公版书</span>
       </button>
     </div>
 
@@ -291,7 +291,7 @@ if (highlightId.value) {
       <p v-if="tab === 'local'" class="text-ink-300 mb-3">书架空空如也</p>
       <p v-else class="text-ink-300 mb-3">还没有在线图书</p>
       <p v-if="tab === 'local'" class="text-xs text-ink-300/70 mb-4">
-        或切换到「在线图书」tab 浏览古登堡免费藏书
+        或切换到「在线图书」tab 浏览公版免费藏书
       </p>
       <div class="flex items-center justify-center gap-2">
         <button v-if="tab === 'local'" @click="showUpload = true" class="btn-primary">
@@ -300,7 +300,7 @@ if (highlightId.value) {
         </button>
         <button v-else @click="router.push('/search')" class="btn-primary">
           <Search class="w-4 h-4" :stroke-width="1.75" />
-          <span>去搜索古登堡</span>
+          <span>搜索公版书</span>
         </button>
       </div>
     </div>
@@ -327,7 +327,7 @@ if (highlightId.value) {
                      bg-amber-700/90 text-white text-[10px] font-medium backdrop-blur-sm">
           🇨🇳 文库
         </span>
-        <!-- hover 操作按钮（在线图书没有公开/删除上传，只保留阅读） -->
+        <!-- hover 操作按钮 -->
         <div class="absolute bottom-[68px] left-2 right-2 flex gap-1
                     opacity-0 group-hover/card:opacity-100 transition-opacity">
           <button @click="readBook(b)" class="flex-1 text-xs h-7 rounded-lg bg-white shadow-sm shadow text-primary-600 font-medium">
@@ -336,7 +336,7 @@ if (highlightId.value) {
           <button v-if="tab === 'local'" @click="handleTogglePublic(b)" class="h-7 px-2 rounded-lg bg-white shadow-sm shadow text-ink-500 flex items-center justify-center" :title="b.is_public ? '取消公开' : '公开'">
             <component :is="b.is_public ? Lock : Globe" class="w-3.5 h-3.5" :stroke-width="1.75" />
           </button>
-          <button v-if="tab === 'local'" @click="handleDelete(b)" class="h-7 px-2 rounded-lg bg-white shadow-sm shadow text-rose-400 flex items-center justify-center" title="删除">
+          <button @click="handleDelete(b)" class="h-7 px-2 rounded-lg bg-white shadow-sm shadow text-rose-400 flex items-center justify-center" title="删除">
             <Trash2 class="w-3.5 h-3.5" :stroke-width="1.75" />
           </button>
         </div>

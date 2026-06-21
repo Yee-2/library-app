@@ -304,11 +304,15 @@ export async function getBook(id: string) {
 }
 
 export async function deleteBook(book: Book) {
-  await supabase.storage.from('book-files').remove([book.file_url])
-  if (book.cover_url) {
-    const coverPath = book.cover_url.split('/book-covers/')[1]
-    if (coverPath) await supabase.storage.from('book-covers').remove([coverPath])
+  // 在线书（古登堡/维基文库）没有 storage 文件
+  if (book.file_url && !book.file_url.startsWith('gutenberg://') && !book.file_url.startsWith('wikisource://')) {
+    await supabase.storage.from('book-files').remove([book.file_url])
+    if (book.cover_url) {
+      const coverPath = book.cover_url.split('/book-covers/')[1]
+      if (coverPath) await supabase.storage.from('book-covers').remove([coverPath])
+    }
   }
+  // 级联删除会清理 gutenberg_books / wikisource_books（外键 on delete cascade）
   const { error } = await supabase.from('books').delete().eq('id', book.id)
   if (error) throw error
 }
