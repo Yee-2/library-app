@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
 
     // Call MiniMax TTS
     const ttsBody = {
-      model: "speech-2.8-hd",
+      model: "speech-02-turbo",
       text: text.slice(0, 5000),
       stream: false,
       voice_setting: {
