@@ -5,7 +5,8 @@ import { useAuthStore } from '@/stores/auth'
 import { listMyAchievements, listAllAchievements, listMyFavorites, listMyBooks, getMyReadingSummary, getUserProfile, uploadAvatar } from '@/lib/books'
 import { getUnreadCount } from '@/lib/notifications'
 import { toast } from '@/lib/toast'
-import { BookOpen, Star, BarChart3, Trophy, UserRound, IdCard, Flame, LogOut, Upload, ChevronRight, Sparkles, Bell } from 'lucide-vue-next'
+import { isGutenbergEnabled } from '@/lib/featureFlags'
+import { BookOpen, Star, BarChart3, Trophy, UserRound, IdCard, Flame, LogOut, Upload, ChevronRight, Sparkles, Bell, Heart } from 'lucide-vue-next'
 import UserAvatar from '@/components/UserAvatar.vue'
 import NicknamePrompt from '@/components/NicknamePrompt.vue'
 import { isEmailLikeUsername, maskEmail } from '@/lib/privacy'
@@ -286,6 +287,26 @@ function openMyFollowing() {
 
       <div class="text-center text-xs text-ink-300 py-4">
         累计阅读 {{ fmtTime(totalSeconds) }}
+      </div>
+
+      <!-- 古登堡致谢（合规要求） -->
+      <div v-if="isGutenbergEnabled()" class="card p-4 mt-2">
+        <div class="flex items-start gap-2 text-xs text-ink-500">
+          <Heart class="w-3.5 h-3.5 mt-0.5 text-rose-400 flex-shrink-0" :stroke-width="2" />
+          <div class="flex-1">
+            <p class="mb-1">
+              <strong>图书来源：</strong>
+              <a href="https://www.gutenberg.org/" target="_blank" rel="noopener"
+                 class="text-primary-600 hover:underline">Project Gutenberg</a>
+              · 公有领域免费书库
+            </p>
+            <p class="text-ink-300 leading-relaxed">
+              「在线图书」tab 中的书目均为版权已过期或作者主动放弃版权的公有领域作品，
+              由志愿者数字化并通过古登堡计划公开发布。我们仅作展示和代理访问，
+              不存储文件本体。如发现版权问题，请联系古登堡官方处理。
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 

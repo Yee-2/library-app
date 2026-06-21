@@ -10,6 +10,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { toast } from '@/lib/toast'
 import { formatBytes, formatDate } from '@/lib/utils'
+import { isGutenbergEnabled } from '@/lib/featureFlags'
 import type { Book } from '@/types'
 import { Upload, Search, Star, BarChart3, X, Globe, Lock, Trash2, BookOpen, Library as LibraryIcon, Wifi } from 'lucide-vue-next'
 import BookCard from '@/components/BookCard.vue'
@@ -18,11 +19,13 @@ import LoginPrompt from '@/components/LoginPrompt.vue'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const gutenbergEnabled = isGutenbergEnabled()
 
 // Tab 状态（从 URL ?tab=online 读取）
 type Tab = 'local' | 'online'
+// 如果功能关闭，强制默认 local tab
 const tab = ref<Tab>(
-  route.query.tab === 'online' ? 'online' : 'local'
+  gutenbergEnabled && route.query.tab === 'online' ? 'online' : 'local'
 )
 
 // 书架数据
@@ -80,7 +83,7 @@ async function refreshLocal() {
 }
 
 async function refreshOnline() {
-  if (!auth.isLoggedIn) return
+  if (!auth.isLoggedIn || !gutenbergEnabled) return
   loadingOnline.value = true
   try {
     onlineBooks.value = await listMyOnlineBooks()
@@ -99,6 +102,10 @@ onMounted(refresh)
 
 // 监听 URL tab 参数变化
 watch(() => route.query.tab, (newTab) => {
+  if (!gutenbergEnabled) {
+    tab.value = 'local'
+    return
+  }
   if (newTab === 'online' || newTab === 'local') {
     tab.value = newTab
   }
@@ -106,7 +113,8 @@ watch(() => route.query.tab, (newTab) => {
 
 function switchTab(newTab: Tab) {
   tab.value = newTab
-  // 同步 URL
+  // 同步 URL —— 如果功能关闭，"online" 不可用
+  if (!gutenbergEnabled && newTab === 'online') return
   router.replace({ query: { ...route.query, tab: newTab === 'local' ? undefined : 'online' } })
 }
 
@@ -231,8 +239,8 @@ if (highlightId.value) {
       </div>
     </div>
 
-    <!-- Tab 切换 -->
-    <div class="inline-flex bg-ink-100 rounded-full p-1 text-sm gap-1 mb-5">
+    <!-- Tab 切换（仅在功能开启时显示） -->
+    <div v-if="gutenbergEnabled" class="inline-flex bg-ink-100 rounded-full p-1 text-sm gap-1 mb-5">
       <button
         @click="switchTab('local')"
         :class="['inline-flex items-center gap-1.5 px-3 h-8 rounded-full transition',

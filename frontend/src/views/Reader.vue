@@ -669,7 +669,11 @@ watch([() => reader.fontId, () => reader.fontSize, () => reader.lineHeight, () =
   }
 })
 
-// =============== TTS ===============
+// =============== TTS ==============
+// 注意：TTS 流程对本地书和古登堡在线书完全一致 ——
+// 不管 fileUrl 是 Supabase signed URL 还是 gutenberg-fetch 返回的 blob URL，
+// renderTxt() 和 renderEpub() 都会把内容加载到前端内存（txtContent / epubBook），
+// TTS 直接从内存取文本。所以在线书无需特殊的 TTS 分支。
 async function startTTS() {
   let text = ''
   if (book.value?.file_format === 'txt') {

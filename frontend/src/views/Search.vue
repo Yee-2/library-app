@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { debounce } from '@/lib/utils'
 import { searchPublicBooksFulltext } from '@/lib/books'
 import { useGutenbergSearch } from '@/composables/useGutenbergSearch'
+import { isGutenbergEnabled } from '@/lib/featureFlags'
 import GutenbergBookCard from '@/components/GutenbergBookCard.vue'
 import {
   ArrowLeft, Search as SearchIcon, BookOpen, TrendingUp, Library as LibraryIcon
@@ -20,6 +21,7 @@ const gutenbergError = ref('')
 const hasSearched = ref(false)
 const quickTags = ['武侠', '科幻', '推理', '历史', '言情', '哲学', '诗集', '散文', '名著', '编程']
 
+const gutenbergEnabled = isGutenbergEnabled()
 const gutenberg = useGutenbergSearch()
 
 const doSearch = debounce(async () => {
@@ -35,7 +37,7 @@ const doSearch = debounce(async () => {
 
   // 两个搜索并发执行（独立 promise，任一失败不影响另一个）
   loading.value = true
-  gutenbergLoading.value = true
+  if (gutenbergEnabled) gutenbergLoading.value = true
 
   const publicSearch = searchPublicBooksFulltext(q.value.trim())
     .then(data => { results.value = data; error.value = '' })
@@ -46,19 +48,25 @@ const doSearch = debounce(async () => {
     })
     .finally(() => { loading.value = false })
 
-  const gutenbergSearch = gutenberg.search(q.value.trim())
-    .then(() => {
-      gutenbergResults.value = gutenberg.results.value
-      gutenbergError.value = gutenberg.error.value
-    })
-    .catch(e => {
-      console.error('[search gutenberg]', e)
-      gutenbergError.value = e?.message ?? '古登堡搜索失败'
-      gutenbergResults.value = []
-    })
-    .finally(() => { gutenbergLoading.value = false })
+  const searches: Promise<unknown>[] = [publicSearch]
 
-  await Promise.all([publicSearch, gutenbergSearch])
+  if (gutenbergEnabled) {
+    searches.push(
+      gutenberg.search(q.value.trim())
+        .then(() => {
+          gutenbergResults.value = gutenberg.results.value
+          gutenbergError.value = gutenberg.error.value
+        })
+        .catch(e => {
+          console.error('[search gutenberg]', e)
+          gutenbergError.value = e?.message ?? '古登堡搜索失败'
+          gutenbergResults.value = []
+        })
+        .finally(() => { gutenbergLoading.value = false })
+    )
+  }
+
+  await Promise.all(searches)
 }, 300)
 
 function pickTag(t: string) {

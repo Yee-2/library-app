@@ -81,7 +81,7 @@ Settings → API：
 - **anon public key** → 记下来（前端用）
 - **service_role key** → 记下来（部署 Edge Function 时用，**绝对不能给前端**）
 
-### 2.5 部署 Edge Functions（TTS）
+### 2.5 部署 Edge Functions
 
 ```bash
 # 1. 安装 Supabase CLI
@@ -105,16 +105,90 @@ supabase secrets set MINIMAX_API_KEY=sk-cp-D6evYSlbZzCCwE04WdjgMe3vJ_anq7YjZhS0k
 # supabase secrets set MINIMAX_TTS_URL=https://api.minimaxi.chat/v1/t2a_v2
 # supabase secrets set MINIMAX_GROUP_ID=你的group_id
 
-# 5. 部署
+# 5. 部署（基础）
 supabase functions deploy tts --no-verify-jwt
 supabase functions deploy public-book-url --no-verify-jwt
+
+# 6. 部署古登堡相关（4 个）
+supabase functions deploy gutenberg-import --no-verify-jwt
+supabase functions deploy gutenberg-fetch --no-verify-jwt
+supabase functions deploy gutenberg-sync --no-verify-jwt
+
+# 7. 设置古登堡同步的管理员白名单（逗号分隔的 user_id 列表）
+#    这些用户可以触发 gutenberg-sync（从 pg_catalog.csv 同步元数据）
+supabase secrets set ADMIN_USER_IDS=你的user_id_uuid1,你的user_id_uuid2
 ```
 
 部署成功后，函数地址是：
 - `https://xxx.supabase.co/functions/v1/tts`
 - `https://xxx.supabase.co/functions/v1/public-book-url`
+- `https://xxx.supabase.co/functions/v1/gutenberg-import`
+- `https://xxx.supabase.co/functions/v1/gutenberg-fetch`
+- `https://xxx.supabase.co/functions/v1/gutenberg-sync`
 
 可以在 Dashboard → Edge Functions 里看到。
+
+---
+
+## 二·五、古登堡集成（可选功能）
+
+> 如果不需要古登堡图书功能，**跳过此章节**即可。把 `VITE_ENABLE_GUTENBERG` 设为 `false` 可隐藏所有相关 UI。
+
+### 1. 执行迁移
+
+在 Supabase SQL Editor 执行：
+
+```bash
+# 在项目根目录
+cat supabase/migrations/018_gutenberg.sql
+```
+
+复制内容到 SQL Editor 执行。会自动创建：
+- `gutenberg_catalog` 表（全站共享的 7 万本 zh+en 元数据池）
+- `gutenberg_books` 表（用户导入记录，1:1 FK → books）
+- RLS 策略 + 索引
+
+### 2. 导入古登堡元数据
+
+任选一种方式：
+
+**方式 A：通过 Edge Function（推荐）**
+
+```bash
+# 用 admin user 的 JWT 调用同步函数
+curl -X POST \
+  -H "Authorization: Bearer 你的admin用户的access_token" \
+  -H "Content-Type: application/json" \
+  https://你的项目.supabase.co/functions/v1/gutenberg-sync
+```
+
+首次会下载 `pg_catalog.csv`（21MB），解析后灌入 `gutenberg_catalog` 表。预计 1-3 分钟。
+
+**方式 B：本地脚本**
+
+```bash
+# 1. 下载 CSV
+curl -o scripts/pg_catalog.csv \
+  https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv
+
+# 2. 设置环境变量
+export SUPABASE_URL=https://你的项目.supabase.co
+export SUPABASE_SERVICE_ROLE_KEY=你的service_role_key
+
+# 3. 跑脚本
+node scripts/import_gutenberg_catalog.mjs
+```
+
+### 3. 验证
+
+```sql
+-- 应该有约 6 万英文 + 1000 中文
+SELECT language, count(*) FROM gutenberg_catalog GROUP BY language;
+```
+
+### 4. 定期同步（可选）
+
+古登堡目录每周更新，建议每月跑一次 `gutenberg-sync` 拉取最新元数据。可手动跑，也可在 Edge Function 里加 cron 触发（后续优化）。
 
 ---
 
@@ -133,13 +207,16 @@ supabase functions deploy public-book-url --no-verify-jwt
 
 ### 3.2 配置环境变量
 
-在 Vercel 项目页 → Settings → Environment Variables，添加：
+在 Vercel 项目设置 → Environment Variables 添加：
 
-| 名称 | 值 |
-|---|---|
-| `VITE_SUPABASE_URL` | `https://xxx.supabase.co`（上一步拿到的） |
-| `VITE_SUPABASE_ANON_KEY` | 你的 anon key |
-| `VITE_APP_NAME` | `云端图书馆` |
+| 变量名 | 值 | 说明 |
+|---|---|---|
+| `VITE_SUPABASE_URL` | `https://xxx.supabase.co` | Supabase Project URL |
+| `VITE_SUPABASE_ANON_KEY` | `eyJhbGc...` | Supabase anon public key |
+| `VITE_APP_NAME` | `云端图书馆` | （可选）应用名 |
+| `VITE_ENABLE_GUTENBERG` | `true` | （可选）古登堡功能开关，默认 true；设为 `false` 隐藏相关 UI |
+
+> 注：Vite 的环境变量必须以 `VITE_` 开头才会暴露给前端。
 
 环境选 **Production / Preview / Development** 全部勾上。
 
