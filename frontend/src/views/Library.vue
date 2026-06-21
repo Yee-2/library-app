@@ -1,20 +1,39 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { listMyBooks, uploadBook, deleteBook, togglePublic, findMyPublicDuplicate } from '@/lib/books'
-import { detectFormat } from '@/lib/books'
+import {
+  listMyLocalBooks, listMyOnlineBooks,
+  uploadBook, deleteBook, togglePublic, findMyPublicDuplicate,
+  detectFormat,
+} from '@/lib/books'
+import { supabase } from '@/lib/supabase'
 import { toast } from '@/lib/toast'
 import { formatBytes, formatDate } from '@/lib/utils'
 import type { Book } from '@/types'
-import { Upload, Search, Star, BarChart3, X, Globe, Lock, Trash2, BookOpen } from 'lucide-vue-next'
+import { Upload, Search, Star, BarChart3, X, Globe, Lock, Trash2, BookOpen, Library as LibraryIcon, Wifi } from 'lucide-vue-next'
 import BookCard from '@/components/BookCard.vue'
 import LoginPrompt from '@/components/LoginPrompt.vue'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
-const books = ref<Book[]>([])
-const loading = ref(false)
+
+// Tab 状态（从 URL ?tab=online 读取）
+type Tab = 'local' | 'online'
+const tab = ref<Tab>(
+  route.query.tab === 'online' ? 'online' : 'local'
+)
+
+// 书架数据
+const localBooks = ref<Book[]>([])
+const onlineBooks = ref<any[]>([])  // Book & { gutenberg_books: [...] }
+const loadingLocal = ref(false)
+const loadingOnline = ref(false)
+
+// 高亮（导入后跳过来）
+const highlightId = ref<string>(route.query.highlight as string ?? '')
+
 const showUpload = ref(false)
 const uploading = ref(false)
 const search = ref('')
@@ -32,8 +51,13 @@ const coverPreview = ref<string | null>(null)
 
 const formats = ['all', 'epub', 'pdf', 'txt', 'mobi'] as const
 
+// 当前 Tab 的书
+const currentBooks = computed(() =>
+  tab.value === 'local' ? localBooks.value : onlineBooks.value
+)
+
 const filtered = computed(() => {
-  return books.value.filter(b => {
+  return currentBooks.value.filter(b => {
     if (filterFormat.value !== 'all' && b.file_format !== filterFormat.value) return false
     if (search.value) {
       const q = search.value.toLowerCase()
@@ -43,19 +67,48 @@ const filtered = computed(() => {
   })
 })
 
-async function refresh() {
+async function refreshLocal() {
   if (!auth.isLoggedIn) return
-  loading.value = true
+  loadingLocal.value = true
   try {
-    books.value = await listMyBooks()
+    localBooks.value = await listMyLocalBooks()
   } catch (e: any) {
-    toast.error('加载失败：' + e.message)
+    toast.error('加载本地书架失败：' + e.message)
   } finally {
-    loading.value = false
+    loadingLocal.value = false
   }
 }
 
+async function refreshOnline() {
+  if (!auth.isLoggedIn) return
+  loadingOnline.value = true
+  try {
+    onlineBooks.value = await listMyOnlineBooks()
+  } catch (e: any) {
+    toast.error('加载在线书架失败：' + e.message)
+  } finally {
+    loadingOnline.value = false
+  }
+}
+
+async function refresh() {
+  await Promise.all([refreshLocal(), refreshOnline()])
+}
+
 onMounted(refresh)
+
+// 监听 URL tab 参数变化
+watch(() => route.query.tab, (newTab) => {
+  if (newTab === 'online' || newTab === 'local') {
+    tab.value = newTab
+  }
+})
+
+function switchTab(newTab: Tab) {
+  tab.value = newTab
+  // 同步 URL
+  router.replace({ query: { ...route.query, tab: newTab === 'local' ? undefined : 'online' } })
+}
 
 function onFilePick(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]
@@ -103,7 +156,7 @@ async function doUpload() {
     author.value = ''
     description.value = ''
     isPublic.value = false
-    await refresh()
+    await refreshLocal()
   } catch (e: any) {
     toast.error('上传失败：' + e.message)
   } finally {
@@ -136,6 +189,11 @@ async function handleTogglePublic(b: Book) {
 function readBook(b: Book | string) {
   const id = typeof b === 'string' ? b : b.id
   router.push(`/read/${id}`)
+}
+
+// 高亮 5 秒后清除
+if (highlightId.value) {
+  setTimeout(() => { highlightId.value = '' }, 5000)
 }
 </script>
 
@@ -173,6 +231,29 @@ function readBook(b: Book | string) {
       </div>
     </div>
 
+    <!-- Tab 切换 -->
+    <div class="inline-flex bg-ink-100 rounded-full p-1 text-sm gap-1 mb-5">
+      <button
+        @click="switchTab('local')"
+        :class="['inline-flex items-center gap-1.5 px-3 h-8 rounded-full transition',
+                 tab === 'local' ? 'bg-white shadow-sm font-medium text-ink-900' : 'text-ink-300 hover:text-ink-600']"
+      >
+        <LibraryIcon class="w-3.5 h-3.5" :stroke-width="2" />
+        我的书架
+        <span v-if="localBooks.length > 0" class="text-[10px] text-ink-300">· {{ localBooks.length }}</span>
+      </button>
+      <button
+        @click="switchTab('online')"
+        :class="['inline-flex items-center gap-1.5 px-3 h-8 rounded-full transition',
+                 tab === 'online' ? 'bg-white shadow-sm font-medium text-ink-900' : 'text-ink-300 hover:text-ink-600']"
+      >
+        <Wifi class="w-3.5 h-3.5" :stroke-width="2" />
+        在线图书
+        <span v-if="onlineBooks.length > 0" class="text-[10px] text-ink-300">· {{ onlineBooks.length }}</span>
+        <span class="text-[10px] text-emerald-600 ml-0.5">· 古登堡</span>
+      </button>
+    </div>
+
     <!-- 搜索 + 格式筛选 -->
     <div class="flex flex-wrap items-center gap-2 mb-5">
       <div class="relative flex-1 min-w-[200px]">
@@ -192,32 +273,57 @@ function readBook(b: Book | string) {
       </div>
     </div>
 
-    <div v-if="loading" class="text-center text-ink-300 py-12">加载中…</div>
+    <div v-if="(tab === 'local' ? loadingLocal : loadingOnline)" class="text-center text-ink-300 py-12">
+      加载中…
+    </div>
 
     <!-- 空状态 -->
     <div v-else-if="filtered.length === 0" class="text-center py-16">
       <BookOpen class="w-16 h-16 mx-auto text-ink-300 mb-3" :stroke-width="1.5" />
-      <p class="text-ink-300 mb-3">书架空空如也</p>
-      <button @click="showUpload = true" class="btn-primary">
-        <Upload class="w-4 h-4" :stroke-width="1.75" />
-        <span>立即导入第一本</span>
-      </button>
+      <p v-if="tab === 'local'" class="text-ink-300 mb-3">书架空空如也</p>
+      <p v-else class="text-ink-300 mb-3">还没有在线图书</p>
+      <p v-if="tab === 'local'" class="text-xs text-ink-300/70 mb-4">
+        或切换到「在线图书」tab 浏览古登堡免费藏书
+      </p>
+      <div class="flex items-center justify-center gap-2">
+        <button v-if="tab === 'local'" @click="showUpload = true" class="btn-primary">
+          <Upload class="w-4 h-4" :stroke-width="1.75" />
+          <span>导入本地书</span>
+        </button>
+        <button v-else @click="router.push('/search')" class="btn-primary">
+          <Search class="w-4 h-4" :stroke-width="1.75" />
+          <span>去搜索古登堡</span>
+        </button>
+      </div>
     </div>
 
     <!-- 书架网格 -->
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-      <div v-for="b in filtered" :key="b.id" class="group/card relative">
+      <div v-for="b in filtered" :key="b.id"
+           class="group/card relative"
+           :class="{ 'ring-2 ring-primary-500 ring-offset-2 rounded-2xl transition': highlightId === b.id }">
         <BookCard :book="b" @open="readBook" />
-        <!-- hover 操作按钮 -->
+        <!-- 在线图书徽章 -->
+        <span v-if="tab === 'online'" class="absolute top-1.5 right-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full
+                 bg-emerald-500/90 text-white text-[10px] font-medium backdrop-blur-sm">
+          <Wifi class="w-3 h-3" :stroke-width="2.5" />在线
+        </span>
+        <span v-if="tab === 'online' && b.gutenberg_books?.[0]?.language"
+              class="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full
+                     bg-ink-800/90 text-white text-[10px] font-medium backdrop-blur-sm">
+          {{ b.gutenberg_books[0].language === 'zh' ? '🇨🇳' : '🇺🇸' }}
+          {{ b.gutenberg_books[0].language.toUpperCase() }}
+        </span>
+        <!-- hover 操作按钮（在线图书没有公开/删除上传，只保留阅读） -->
         <div class="absolute bottom-[68px] left-2 right-2 flex gap-1
                     opacity-0 group-hover/card:opacity-100 transition-opacity">
           <button @click="readBook(b)" class="flex-1 text-xs h-7 rounded-lg bg-white shadow-sm shadow text-primary-600 font-medium">
             阅读
           </button>
-          <button @click="handleTogglePublic(b)" class="h-7 px-2 rounded-lg bg-white shadow-sm shadow text-ink-500 flex items-center justify-center" :title="b.is_public ? '取消公开' : '公开'">
+          <button v-if="tab === 'local'" @click="handleTogglePublic(b)" class="h-7 px-2 rounded-lg bg-white shadow-sm shadow text-ink-500 flex items-center justify-center" :title="b.is_public ? '取消公开' : '公开'">
             <component :is="b.is_public ? Lock : Globe" class="w-3.5 h-3.5" :stroke-width="1.75" />
           </button>
-          <button @click="handleDelete(b)" class="h-7 px-2 rounded-lg bg-white shadow-sm shadow text-rose-400 flex items-center justify-center" title="删除">
+          <button v-if="tab === 'local'" @click="handleDelete(b)" class="h-7 px-2 rounded-lg bg-white shadow-sm shadow text-rose-400 flex items-center justify-center" title="删除">
             <Trash2 class="w-3.5 h-3.5" :stroke-width="1.75" />
           </button>
         </div>

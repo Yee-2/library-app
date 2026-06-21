@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { getBook, getMyBookFileUrl, upsertProgress, getProgress, listBookmarks, addBookmark, deleteBookmark, listNotes, addNote, deleteNote, reportReadingHeartbeat } from '@/lib/books'
+import { getBook, getMyBookFileUrl, fetchOnlineBookFile, checkIsGutenbergBook, upsertProgress, getProgress, listBookmarks, addBookmark, deleteBookmark, listNotes, addNote, deleteNote, reportReadingHeartbeat } from '@/lib/books'
 import { toast } from '@/lib/toast'
 import { useReaderStore } from '@/stores/reader'
 import { ttsSynthesize, splitSentences, extractPdfText } from '@/lib/tts'
@@ -20,6 +20,8 @@ const book = ref<Book | null>(null)
 const fileUrl = ref<string>('')
 const loading = ref(true)
 const error = ref('')
+const isOnlineBook = ref(false)  // 是否古登堡在线书
+const onlineBlobUrl = ref<string | null>(null)  // 卸载时要 revoke
 
 // 状态面板
 const showSettings = ref(false)
@@ -101,9 +103,27 @@ onMounted(async () => {
       error.value = '无权访问此书（此书属于其他用户）'
       return
     }
-    console.log('[reader] creating signed url...')
-    fileUrl.value = await getMyBookFileUrl(loaded)
-    console.log('[reader] signed url =', fileUrl.value.slice(0, 80) + '...')
+
+    // 检测是否古登堡在线书
+    const gbInfo = await checkIsGutenbergBook(bookId.value)
+    if (gbInfo?.isGutenberg) {
+      console.log('[reader] detected gutenberg book, gutenberg_id =', gbInfo.gutenberg_id)
+      isOnlineBook.value = true
+      // 用 gutenberg-fetch 拿 blob URL（已包含 epub/txt 完整文件）
+      const online = await fetchOnlineBookFile(bookId.value)
+      onlineBlobUrl.value = online.blobUrl
+      fileUrl.value = online.blobUrl
+      // 古登堡书的 file_format 可能是 'epub' 默认值,确保渲染器选对分支
+      if (loaded.file_format !== online.format) {
+        loaded.file_format = online.format
+        book.value = { ...loaded, file_format: online.format }
+      }
+    } else {
+      console.log('[reader] creating signed url...')
+      fileUrl.value = await getMyBookFileUrl(loaded)
+    }
+    console.log('[reader] fileUrl =', fileUrl.value.slice(0, 80) + '...')
+
     await loadSideData()
     // 关键：先翻 loading=false 让 <div ref="readerRef"> 挂上 DOM，再 renderReader
     loading.value = false
@@ -114,6 +134,14 @@ onMounted(async () => {
     error.value = e.message ?? String(e)
   } finally {
     loading.value = false
+  }
+})
+
+onBeforeUnmount(() => {
+  // 释放古登堡书的 blob URL
+  if (onlineBlobUrl.value) {
+    URL.revokeObjectURL(onlineBlobUrl.value)
+    onlineBlobUrl.value = null
   }
 })
 
@@ -898,8 +926,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <ArrowLeft class="w-4 h-4" :stroke-width="1.75" />
           <span class="hidden sm:inline">返回</span>
         </RouterLink>
-        <div class="flex-1 text-center text-sm font-medium truncate" :title="book?.title">
-          {{ book?.title || '加载中…' }}
+        <div class="flex-1 flex items-center justify-center gap-1.5 min-w-0">
+          <div class="text-center text-sm font-medium truncate" :title="book?.title">
+            {{ book?.title || '加载中…' }}
+          </div>
+          <span v-if="isOnlineBook" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded
+                   bg-emerald-500/90 text-white text-[10px] font-medium flex-shrink-0">
+            <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            在线
+          </span>
         </div>
         <div class="flex items-center gap-0.5">
           <button @click="showToc = !showToc" class="btn-icon btn-ghost" title="目录">

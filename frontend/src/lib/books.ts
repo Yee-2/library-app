@@ -129,6 +129,69 @@ export async function listMyBooks() {
   return data as Book[]
 }
 
+/**
+ * 列出我的本地书（排除在线导入的古登堡书）
+ */
+export async function listMyLocalBooks() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+  const { data, error } = await supabase
+    .from('books')
+    .select('*')
+    .eq('user_id', user.id)
+    // 通过 NOT EXISTS 排除有 gutenberg_books 记录的书
+    .not('id', 'in', `(
+      select book_id from public.gutenberg_books
+    )`)
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+  return data as Book[]
+}
+
+/**
+ * 列出我的在线古登堡书（JOIN gutenberg_books 拿 language/format）
+ */
+export async function listMyOnlineBooks() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+  const { data, error } = await supabase
+    .from('books')
+    .select('*, gutenberg_books!inner(language, format, gutenberg_id)')
+    .eq('user_id', user.id)
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as Array<Book & {
+    gutenberg_books: { language: string; format: string | null; gutenberg_id: number }[]
+  }>
+}
+
+/**
+ * 检查一本书是否是古登堡在线书（Reader.vue 用）
+ */
+export async function checkIsGutenbergBook(bookId: string): Promise<{
+  isGutenberg: boolean
+  gutenberg_id?: number
+  language?: 'zh' | 'en'
+  format?: 'epub' | 'txt' | null
+} | null> {
+  const { data, error } = await supabase
+    .from('gutenberg_books')
+    .select('gutenberg_id, language, format')
+    .eq('book_id', bookId)
+    .maybeSingle()
+  if (error) {
+    console.warn('[checkIsGutenbergBook]', error)
+    return null
+  }
+  if (!data) return { isGutenberg: false }
+  return {
+    isGutenberg: true,
+    gutenberg_id: data.gutenberg_id,
+    language: data.language as 'zh' | 'en',
+    format: data.format as 'epub' | 'txt' | null,
+  }
+}
+
 export async function listPublicBooks(opts: { q?: string; page?: number; pageSize?: number } = {}) {
   const page = opts.page ?? 0
   const pageSize = opts.pageSize ?? 20
@@ -192,6 +255,61 @@ export async function getMyBookFileUrl(book: Book) {
     .createSignedUrl(book.file_url, 3600)
   if (error) throw error
   return data.signedUrl
+}
+
+/**
+ * 从 gutenberg-fetch Edge Function 拉在线图书，转换为 Blob URL
+ * @returns { blobUrl, format, contentType, size }
+ */
+export async function fetchOnlineBookFile(bookId: string): Promise<{
+  blobUrl: string
+  format: 'epub' | 'txt'
+  contentType: string
+  size: number
+  fromCache: boolean
+}> {
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token
+  if (!token) throw new Error('未登录或会话已过期')
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30_000)  // 30s 足够 gutenberg.org 下载
+
+  try {
+    const res = await fetch(`${FUNCTIONS_URL}/gutenberg-fetch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ book_id: bookId }),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`古登堡代理失败 (${res.status}): ${text || '服务暂时不可用'}`)
+    }
+    const json = await res.json()
+    // base64 → bytes → Blob → blob URL
+    const binStr = atob(json.data_base64)
+    const bytes = new Uint8Array(binStr.length)
+    for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
+    const blob = new Blob([bytes], { type: json.content_type })
+    const blobUrl = URL.createObjectURL(blob)
+
+    return {
+      blobUrl,
+      format: json.format,
+      contentType: json.content_type,
+      size: json.size,
+      fromCache: !!json.from_cache,
+    }
+  } catch (e: any) {
+    if (e.name === 'AbortError') throw new Error('古登堡代理超时，请检查网络后重试')
+    throw e
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 export async function getPublicBookUrl(bookId: string) {
