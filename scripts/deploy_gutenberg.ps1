@@ -107,19 +107,29 @@ try {
         if (Test-Path $ExtractDir) { Remove-Item -Recurse -Force $ExtractDir }
         [System.IO.Compression.ZipFile]::ExtractToDirectory($TempZip, $ExtractDir)
 
-        # 找到 supabase.exe
-        $ExtractedExe = Join-Path $ExtractDir "supabase.exe"
-        if (-not (Test-Path $ExtractedExe)) {
-          # 可能在子目录里
-          $ExtractedExe = Get-ChildItem -Path $ExtractDir -Filter "supabase.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
-        }
+        # 找到 supabase.exe 和 supabase-go.exe
+        $ExtractedExe = Get-ChildItem -Path $ExtractDir -Filter "supabase.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+        $ExtractedGo  = Get-ChildItem -Path $ExtractDir -Filter "supabase-go.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+
+        $neededCount = 0
         if (Test-Path $ExtractedExe) {
           Move-Item -Force $ExtractedExe $CliExe
-          Remove-Item -Recurse -Force $ExtractDir
-          Remove-Item -Force $TempZip
-          $downloadOk = $true
-        } else {
+          $neededCount++
+        }
+        if (Test-Path $ExtractedGo) {
+          $DestGo = Join-Path $ToolsDir "supabase-go.exe"
+          Move-Item -Force $ExtractedGo $DestGo
+          $neededCount++
+        }
+
+        Remove-Item -Recurse -Force $ExtractDir
+        Remove-Item -Force $TempZip
+
+        if ($neededCount -eq 0) {
           Write-Err "supabase.exe not found in zip"
+        } else {
+          $downloadOk = $true
+          Write-Host "    Extracted $neededCount binaries to $ToolsDir"
         }
       }
     } catch {
@@ -151,8 +161,12 @@ try {
   # Step 2: Login check
   # ----------------------------------------------------------
   Write-Step "Step 2/7: Check login status"
-  $null = & $CliExe projects list 2>&1
-  if ($LASTEXITCODE -ne 0) {
+  # supabase projects list 在未登录时返回非 0 exit code
+  # 已登录但未 link 时 exit code = 0 + 仍然能列出项目
+  # 不能用 $null = & 捕获（PowerShell bug: $ErrorActionPreference=Stop 时 stderr 会冒泡成 terminating error）
+  & $CliExe projects list *> $null 2>&1
+  $loginOk = ($LASTEXITCODE -eq 0)
+  if (-not $loginOk) {
     Write-Warn "Not logged in. Browser will open..."
     & $CliExe login
     if ($LASTEXITCODE -ne 0) {
@@ -254,21 +268,33 @@ try {
   Write-Step "Step 5/7: Deploy Edge Functions"
   $Functions = @("gutenberg-import", "gutenberg-fetch", "gutenberg-sync")
   $deployOk = $true
+  $prevEAP = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"  # Docker warnings should not terminate
 
   foreach ($fn in $Functions) {
     Write-Host "    Deploying $fn..."
-    $null = & $CliExe functions deploy $fn --no-verify-jwt 2>&1
+    & $CliExe functions deploy $fn --no-verify-jwt
     if ($LASTEXITCODE -ne 0) {
-      Write-Err "Failed to deploy $fn"
+      Write-Warn "Deploy $fn failed"
       $deployOk = $false
     } else {
       Write-Ok "$fn deployed"
     }
   }
 
+  $ErrorActionPreference = $prevEAP
+
   if (-not $deployOk) {
-    Write-Err "Some functions failed to deploy"
-    exit 3
+    Write-Warn "Some functions failed to deploy"
+    Write-Host ""
+    Write-Host "    If Docker is not installed, deploy via Supabase Dashboard:"
+    Write-Host "      1. Open https://supabase.com/dashboard/project/$ProjectRef/functions"
+    Write-Host "      2. Create new function with the same name"
+    Write-Host "      3. Copy code from supabase/functions/<name>/index.ts"
+    Write-Host ""
+    Write-Host "    Or install Docker Desktop:"
+    Write-Host "      https://www.docker.com/products/docker-desktop/"
+    Write-Host ""
   }
 
   # ----------------------------------------------------------
@@ -347,7 +373,8 @@ try {
   Write-Host "    3. Visit /search and try searching 'War and Peace'"
   Write-Host ""
   Write-Host "  Functions deployed:" -ForegroundColor Cyan
-  $null = & $CliExe functions list 2>&1 | Select-String "gutenberg-"
+  $funcs = & $CliExe functions list *> $null 2>&1
+  $funcs | Select-String "gutenberg-" | ForEach-Object { Write-Host "    $_" }
   Write-Host ""
 }
 catch {
