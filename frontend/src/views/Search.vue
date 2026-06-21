@@ -3,31 +3,62 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { debounce } from '@/lib/utils'
 import { searchPublicBooksFulltext } from '@/lib/books'
-import { ArrowLeft, Search as SearchIcon, BookOpen, TrendingUp } from 'lucide-vue-next'
+import { useGutenbergSearch } from '@/composables/useGutenbergSearch'
+import GutenbergBookCard from '@/components/GutenbergBookCard.vue'
+import {
+  ArrowLeft, Search as SearchIcon, BookOpen, TrendingUp, Library as LibraryIcon
+} from 'lucide-vue-next'
 
 const router = useRouter()
 const q = ref('')
-const scope = ref<'public' | 'mine'>('public')
-const results = ref<any[]>([])
+const results = ref<any[]>([])              // 公开书库结果
+const gutenbergResults = ref<any[]>([])     // 古登堡结果
 const loading = ref(false)
+const gutenbergLoading = ref(false)
 const error = ref('')
+const gutenbergError = ref('')
 const hasSearched = ref(false)
 const quickTags = ['武侠', '科幻', '推理', '历史', '言情', '哲学', '诗集', '散文', '名著', '编程']
 
+const gutenberg = useGutenbergSearch()
+
 const doSearch = debounce(async () => {
-  if (!q.value.trim()) { results.value = []; error.value = ''; hasSearched.value = false; return }
-  loading.value = true
-  error.value = ''
-  hasSearched.value = true
-  try {
-    results.value = await searchPublicBooksFulltext(q.value.trim())
-  } catch (e: any) {
-    console.error('[search]', e)
-    error.value = e?.message ?? '搜索失败，请重试'
+  if (!q.value.trim()) {
     results.value = []
-  } finally {
-    loading.value = false
+    gutenbergResults.value = []
+    error.value = ''
+    gutenbergError.value = ''
+    hasSearched.value = false
+    return
   }
+  hasSearched.value = true
+
+  // 两个搜索并发执行（独立 promise，任一失败不影响另一个）
+  loading.value = true
+  gutenbergLoading.value = true
+
+  const publicSearch = searchPublicBooksFulltext(q.value.trim())
+    .then(data => { results.value = data; error.value = '' })
+    .catch(e => {
+      console.error('[search public]', e)
+      error.value = e?.message ?? '公开书库搜索失败'
+      results.value = []
+    })
+    .finally(() => { loading.value = false })
+
+  const gutenbergSearch = gutenberg.search(q.value.trim())
+    .then(() => {
+      gutenbergResults.value = gutenberg.results.value
+      gutenbergError.value = gutenberg.error.value
+    })
+    .catch(e => {
+      console.error('[search gutenberg]', e)
+      gutenbergError.value = e?.message ?? '古登堡搜索失败'
+      gutenbergResults.value = []
+    })
+    .finally(() => { gutenbergLoading.value = false })
+
+  await Promise.all([publicSearch, gutenbergSearch])
 }, 300)
 
 function pickTag(t: string) {
@@ -36,6 +67,10 @@ function pickTag(t: string) {
 }
 
 function go(b: any) { router.push(`/book/${b.id}`) }
+
+const totalCount = computed(() => results.value.length + gutenbergResults.value.length)
+const showGutenbergSection = computed(() => gutenbergResults.value.length > 0)
+const showPublicSection = computed(() => results.value.length > 0)
 </script>
 
 <template>
@@ -75,24 +110,71 @@ function go(b: any) { router.push(`/book/${b.id}`) }
       </div>
     </div>
 
-    <div v-if="loading" class="text-center text-ink-300 py-8">搜索中…</div>
-    <div v-else-if="error" class="text-center text-rose-400 py-8">{{ error }}</div>
-    <div v-else-if="hasSearched && q && results.length === 0" class="text-center py-16">
+    <!-- 加载中 -->
+    <div v-if="(loading || gutenbergLoading) && totalCount === 0" class="text-center text-ink-300 py-8">
+      搜索中…
+    </div>
+
+    <!-- 完全无结果 -->
+    <div v-else-if="hasSearched && q && totalCount === 0 && !loading && !gutenbergLoading"
+         class="text-center py-16">
       <BookOpen class="w-12 h-12 mx-auto text-ink-300 mb-2" :stroke-width="1.5" />
       <p class="text-ink-300">没找到相关结果</p>
+      <p class="text-xs text-ink-300 mt-1">试试其他关键词，或浏览公开书库</p>
     </div>
-    <div v-else class="space-y-2">
-      <div v-for="b in results" :key="b.id" class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition" @click="go(b)">
-        <div class="w-12 h-16 bg-ink-100 rounded-md overflow-hidden flex-shrink-0">
-          <img v-if="b.cover_url" :src="b.cover_url" class="w-full h-full object-cover" :alt="b.title" />
+
+    <!-- 古登堡分组（优先展示） -->
+    <template v-else-if="hasSearched && (showGutenbergSection || gutenbergLoading)">
+      <div v-if="showGutenbergSection || gutenbergLoading" class="mb-6">
+        <div class="flex items-center gap-2 mb-3">
+          <LibraryIcon class="w-4 h-4 text-primary-600" :stroke-width="2" />
+          <h2 class="text-sm font-semibold text-ink-700">古登堡计划</h2>
+          <span class="text-xs text-ink-300">
+            {{ gutenbergLoading ? '搜索中…' : `${gutenbergResults.length} 本` }}
+          </span>
+          <span class="text-xs text-ink-300">· 公有领域 · 免费</span>
         </div>
-        <div class="flex-1 min-w-0">
-          <div class="font-medium text-sm line-clamp-1 text-ink-800">{{ b.title }}</div>
-          <div class="text-xs text-ink-300">{{ b.author || '佚名' }}</div>
-          <div v-if="b.description" class="text-xs text-ink-300 line-clamp-1 mt-0.5">{{ b.description }}</div>
+        <div v-if="gutenbergError" class="text-center text-rose-400 py-4 text-sm">
+          古登堡搜索失败：{{ gutenbergError }}
         </div>
-        <span class="text-xs text-ink-300 uppercase font-mono">{{ b.file_format }}</span>
+        <div v-else class="space-y-2">
+          <GutenbergBookCard
+            v-for="b in gutenbergResults"
+            :key="b.gutenberg_id"
+            :book="b"
+          />
+        </div>
       </div>
-    </div>
+
+      <!-- 公开书库分组 -->
+      <div v-if="showPublicSection || loading">
+        <div class="flex items-center gap-2 mb-3">
+          <BookOpen class="w-4 h-4 text-emerald-600" :stroke-width="2" />
+          <h2 class="text-sm font-semibold text-ink-700">公开书库</h2>
+          <span class="text-xs text-ink-300">
+            {{ loading ? '搜索中…' : `${results.length} 本` }}
+          </span>
+          <span class="text-xs text-ink-300">· 用户分享</span>
+        </div>
+        <div v-if="error" class="text-center text-rose-400 py-4 text-sm">
+          公开书库搜索失败：{{ error }}
+        </div>
+        <div v-else class="space-y-2">
+          <div v-for="b in results" :key="b.id"
+               class="card p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition"
+               @click="go(b)">
+            <div class="w-12 h-16 bg-ink-100 rounded-md overflow-hidden flex-shrink-0">
+              <img v-if="b.cover_url" :src="b.cover_url" class="w-full h-full object-cover" :alt="b.title" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm line-clamp-1 text-ink-800">{{ b.title }}</div>
+              <div class="text-xs text-ink-300">{{ b.author || '佚名' }}</div>
+              <div v-if="b.description" class="text-xs text-ink-300 line-clamp-1 mt-0.5">{{ b.description }}</div>
+            </div>
+            <span class="text-xs text-ink-300 uppercase font-mono">{{ b.file_format }}</span>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
