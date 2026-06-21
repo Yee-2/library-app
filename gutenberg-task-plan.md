@@ -38,19 +38,28 @@
 
 **目标：** DB 新表 + CSV 导入 + 3 个后端 Edge Function 上线（导入 / 拉取 / 同步）
 
-### 1.0 下载 pg_catalog.csv + 字段映射
+### 1.0 下载 pg_catalog.csv + 字段映射 [done]
 
-- [ ] 用 curl 下载 `https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv` 到本地（保存为 `scripts/pg_catalog.csv`）
-- [ ] 用 `head -5 scripts/pg_catalog.csv` 检查列结构
-- [ ] 记录字段映射（CSV 列 → DB 列）：
-  - `id` → `gutenberg_id` (INT)
-  - `title` → `title` (TEXT)
-  - `authors` → `author`（多个作者用 `; ` 分隔）
-  - `language` → `language` (CHAR(2))
-  - `downloads` → `download_count` (INT)
-  - 解析 `formats` JSON 字段提取 `application/epub+zip` URL → `epub_url`
-  - 解析 `formats` JSON 字段提取 `text/plain; charset=utf-8` URL → `txt_url`
-  - 解析 `formats` JSON 字段提取 `image/jpeg` URL → `cover_url`（部分书有）
+- [x] 用 curl 下载 `https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv` 到 `scripts/pg_catalog.csv`（21MB）
+- [x] CSV 列结构（9 列）：`Text#,Type,Issued,Title,Language,Authors,Subjects,LoCC,Bookshelves`
+- [x] **字段映射**（CSV 列 → DB 列）：
+  - `Text#` → `gutenberg_id` (INT)
+  - `Title` → `title` (TEXT)
+  - `Authors` → `author` (TEXT，多作者用 `, ` 分隔)
+  - `Language` → `language` (CHAR(2)，CSV 里是 ISO 639-1: `en` / `zh` 等)
+  - ⚠️ CSV **没有** `epub_url` / `txt_url` / `cover_url` / `download_count` 列 —— 需要从古登堡网页解析或 URL 模板化
+- [x] **URL 模板**（实测确认，HTTP 302 → 200 跟随后是真实文件）：
+  - EPUB（推荐）：`https://www.gutenberg.org/ebooks/{id}.epub3.images` (含封面图)
+  - EPUB（无图）：`https://www.gutenberg.org/ebooks/{id}.epub3.noimages`
+  - EPUB（v2）：`https://www.gutenberg.org/ebooks/{id}.epub.images`
+  - TXT：`https://www.gutenberg.org/ebooks/{id}.txt.utf-8`
+  - **采用：`{id}.epub3.images`（有图版，184KB 验证成功）**
+- [x] **下载 count 来源**：CSV 里没有这列。方案：
+  - 方案 A：用 gutenberg_id 本身排序热度（ID 越小越老 = 越经典）
+  - 方案 B：导流时从 catalog.csv 的 Issued 日期推断（旧书 = 受众广）
+  - 方案 C：跑一个简单的 popularity 字段，每次 sync 时从古登堡「本周热门」页抓
+  - **采用方案 A + B 复合**：`ORDER BY download_count DESC, gutenberg_id ASC` —— 后续可优化
+- [x] **download_count 字段在 catalog 表保留为 0**，导入时不需要，等后续增量同步时填充
 
 ### 1.1 数据库迁移
 
@@ -73,8 +82,19 @@
 ### 1.2 CSV 导入脚本（一次性任务）
 
 - [ ] 创建 `scripts/import_gutenberg_catalog.mjs`（Node.js 脚本）
-- [ ] 读 `scripts/pg_catalog.csv`
-- [ ] 过滤 `language IN ('zh', 'en')`
+- [ ] 读 `scripts/pg_catalog.csv`（流式处理，21MB / 7万行）
+- [ ] 过滤 `Language IN ('zh', 'en')`（约 60000 英文 + 1000 中文）
+- [ ] 字段映射：
+  ```
+  Text#    → gutenberg_id
+  Title    → title
+  Authors  → author
+  Language → language
+  ```
+- [ ] **URL 模板填充**（不解析 CSV 字段，直接拼）：
+  - `epub_url = 'https://www.gutenberg.org/ebooks/' + id + '.epub3.images'`
+  - `txt_url  = 'https://www.gutenberg.org/ebooks/' + id + '.txt.utf-8'`
+  - `cover_url = NULL`（暂时留空，后续可从古登堡页面解析）
 - [ ] 用 `pg` npm 包或 Supabase 批量 INSERT 到 `gutenberg_catalog`
 - [ ] 进度日志：每 1000 条打印一次
 - [ ] 去重：`ON CONFLICT (gutenberg_id) DO UPDATE` 保证幂等

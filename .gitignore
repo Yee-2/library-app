@@ -29,3 +29,7 @@ supabase/supabase/
 # supabase CLI binaries (use `npx supabase` or download separately)
 supabase.exe
 supabase-go.exe
+
+# scripts
+scripts/pg_catalog.csv
+scripts/*.test.mjs
