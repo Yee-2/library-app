@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
         title: catalog.title,
         author: catalog.author ?? null,
         cover_url: catalog.cover_url ?? null,
-        file_url: null,            // 在线书，文件不在 Storage
+        file_url: `gutenberg://${catalog.gutenberg_id}`,  // 占位值，file_format='epub' 标识在线书
         file_format: "epub",       // 默认 epub，首次阅读时 fetch 会确认
         file_size: null,
         language: catalog.language,

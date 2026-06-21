@@ -4,9 +4,9 @@
 // 鉴权：管理员（用 ADMIN_USER_IDS 环境变量白名单，逗号分隔）
 //
 // 流式设计说明：
-//   pg_catalog.csv 约 21MB / 7 万行。如果用 csvRes.text() 一次性加载 + parseCsv 转 2D 数组，
-//   内存占用会超过 Edge Function 的 256MB 限制导致 WORKER_RESOURCE_LIMIT。
-//   改用逐行流式解析，每 500 行 flush 一次 UPSERT，减少内存峰值。
+//   pg_catalog.csv 约 21MB / 9 万行，部分字段含引号内换行。
+//   用逐字符流式解析（非按行切分），正确处理引号内逗号和换行。
+//   每 500 行 flush 一次 UPSERT，减少内存峰值。
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
@@ -21,7 +21,7 @@ const corsHeaders = {
 };
 
 const CATALOG_URL = "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv";
-const DOWNLOAD_TIMEOUT_MS = 120000;  // 120s: 21MB CSV 下载 + 流式处理
+const DOWNLOAD_TIMEOUT_MS = 180000;
 const BATCH_SIZE = 500;
 const ALLOWED_LANGS = new Set(["zh", "en"]);
 
@@ -29,7 +29,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
-
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
   }
@@ -40,14 +39,11 @@ Deno.serve(async (req) => {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return json({ error: "Missing authorization" }, 401);
     }
-
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: "Unauthorized" }, 401);
-
-    // 管理员校验
     if (ADMIN_USER_IDS.length === 0 || !ADMIN_USER_IDS.includes(user.id)) {
       return json({ error: "Forbidden: admin only" }, 403);
     }
@@ -56,11 +52,10 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, serviceKey);
 
     // ============================================
-    // 流式下载 + 逐行解析
+    // 流式逐字符 CSV 解析
     // ============================================
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
-
     let csvRes: Response;
     try {
       csvRes = await fetch(CATALOG_URL, { signal: controller.signal });
@@ -69,140 +64,162 @@ Deno.serve(async (req) => {
       return json({ error: "csv_download_failed", detail: String(e) }, 502);
     }
     clearTimeout(timeoutId);
-
     if (!csvRes.ok) {
       return json({ error: "csv_download_failed", status: csvRes.status }, 502);
     }
 
-    // 流式逐行解析
+    // 逐字符流式状态
     const reader = csvRes.body!.getReader();
     const decoder = new TextDecoder();
-    let buffer = "";
 
-    // header 索引
-    let idx: { id: number; title: number; author: number; language: number } | null = null;
+    // CSV 解析状态
+    const field: string[] = [];   // 当前字段字符
+    const row: string[] = [];     // 当前行字段列表
+    let inQuotes = false;
+    let headerParsed = false;
+    let idx = { id: -1, title: -1, author: -1, language: -1 };
 
     // 批处理
     const langCounts: Record<string, number> = { zh: 0, en: 0 };
     let batch: any[] = [];
     let totalSynced = 0;
     let totalSkipped = 0;
-    let headerDone = false;
+
+    // 每次 read 后 flush 当前 field+row
+    function flushRow() {
+      if (row.length === 0 && field.length === 0) return;
+      // 把当前 field 加入 row
+      row.push(field.join(""));
+      field.length = 0;
+
+      if (row.length === 0) return;
+      const hasContent = row.some(f => f.length > 0);
+      if (!hasContent) { row.length = 0; return; }
+
+      if (!headerParsed) {
+        // 第一行 = header
+        const hId = row.indexOf("Text#");
+        const hTitle = row.indexOf("Title");
+        const hAuthor = row.indexOf("Authors");
+        const hLang = row.indexOf("Language");
+        if (hId >= 0 && hTitle >= 0 && hLang >= 0) {
+          idx = { id: hId, title: hTitle, author: hAuthor, language: hLang };
+          headerParsed = true;
+        }
+        row.length = 0;
+        return;
+      }
+
+      // 数据行
+      if (row.length <= Math.max(idx.id, idx.title, idx.language)) {
+        row.length = 0;
+        return;
+      }
+
+      const lang = (row[idx.language] ?? "").trim().toLowerCase();
+      if (!ALLOWED_LANGS.has(lang)) {
+        totalSkipped++;
+        row.length = 0;
+        return;
+      }
+
+      const gId = parseInt(row[idx.id], 10);
+      if (!gId) { totalSkipped++; row.length = 0; return; }
+
+      const title = (row[idx.title] ?? "").trim();
+      if (!title) { totalSkipped++; row.length = 0; return; }
+
+      const author = (row[idx.author] ?? "").trim();
+      langCounts[lang] = (langCounts[lang] ?? 0) + 1;
+
+      batch.push({
+        gutenberg_id: gId,
+        title: title.slice(0, 500),
+        author: author.slice(0, 500) || null,
+        language: lang,
+        epub_url: `https://www.gutenberg.org/ebooks/${gId}.epub3.images`,
+        txt_url: `https://www.gutenberg.org/ebooks/${gId}.txt.utf-8`,
+        cover_url: null,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (batch.length >= BATCH_SIZE) {
+        // 同步 flush
+        totalSynced += batch.length;
+      }
+
+      row.length = 0;
+    }
+
+    async function flushBatch() {
+      if (batch.length === 0) return;
+      await upsertBatch(admin, batch);
+      if (totalSynced % 5000 === 0) {
+        console.log(`[sync] progress: ${totalSynced} synced, ${totalSkipped} skipped`);
+      }
+      batch = [];
+    }
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) {
-        // 处理最后一行
-        if (buffer.trim().length > 0) {
-          processLine(buffer, idx!, langCounts, batch);
-        }
-        // 处理剩余批次
-        if (batch.length > 0) {
-          await upsertBatch(admin, batch);
-          totalSynced += batch.length;
-          batch = [];
-        }
-        break;
-      }
+      const chunk = done ? "" : decoder.decode(value, { stream: true });
 
-      buffer += decoder.decode(value, { stream: true });
+      // 逐字符处理
+      for (let i = 0; i < chunk.length; i++) {
+        const c = chunk[i];
 
-      // 按行切分
-      // 换行符可能是 \n 或 \r\n
-      let newlineIdx: number;
-      let prevIdx = 0;
-
-      while ((newlineIdx = buffer.indexOf("\n", prevIdx)) !== -1) {
-        let line: string;
-
-        // 处理 \r\n
-        if (newlineIdx > 0 && buffer[newlineIdx - 1] === "\r") {
-          line = buffer.slice(prevIdx, newlineIdx - 1);
-        } else {
-          line = buffer.slice(prevIdx, newlineIdx);
-        }
-
-        prevIdx = newlineIdx + 1;
-
-        // 跳过空行
-        if (line.length === 0) continue;
-
-        // 检查行是否完整（引号闭合）
-        const quoteCount = (line.match(/"/g) || []).length;
-        if (quoteCount % 2 !== 0) {
-          // 引号未闭合 -> 跨行了，说明这一行不完整，继续积累 buffer
-          // 但跨行字段在 pg_catalog.csv 里极少见，我们保留该行在 buffer 里由下一轮处理
-          // 实际上我们不截断 buffer，而是在下一轮继续积累
-          // 但为了不无限循环，如果 prevIdx 没有推进，需要跳出
-          break;
-        }
-
-        // 更新 header 或处理数据行
-        const trimmed = line.trim();
-        if (trimmed.length === 0) continue;
-
-        if (!headerDone) {
-          // 第一行是 header
-          const parts = parseCsvLine(trimmed);
-          const hId = parts.indexOf("Text#");
-          const hTitle = parts.indexOf("Title");
-          const hAuthor = parts.indexOf("Authors");
-          const hLang = parts.indexOf("Language");
-          if (hId < 0 || hTitle < 0 || hLang < 0) {
-            return json({ error: "csv_missing_columns", got_header: parts }, 400);
-          }
-          idx = { id: hId, title: hTitle, author: hAuthor, language: hLang };
-          headerDone = true;
-        } else {
-          const fields = parseCsvLine(trimmed);
-          if (fields.length <= Math.max(idx!.id, idx!.title, idx!.language)) continue;
-
-          const lang = (fields[idx!.language] ?? "").trim().toLowerCase();
-          if (!ALLOWED_LANGS.has(lang)) {
-            totalSkipped++;
-            continue;
-          }
-
-          const gId = parseInt(fields[idx!.id], 10);
-          if (!gId) { totalSkipped++; continue; }
-
-          const title = (fields[idx!.title] ?? "").trim();
-          if (!title) { totalSkipped++; continue; }
-
-          const author = (fields[idx!.author] ?? "").trim();
-
-          langCounts[lang] = (langCounts[lang] ?? 0) + 1;
-
-          batch.push({
-            gutenberg_id: gId,
-            title: title.slice(0, 500),
-            author: author.slice(0, 500) || null,
-            language: lang,
-            epub_url: `https://www.gutenberg.org/ebooks/${gId}.epub3.images`,
-            txt_url: `https://www.gutenberg.org/ebooks/${gId}.txt.utf-8`,
-            cover_url: null,
-            updated_at: new Date().toISOString(),
-          });
-
-          if (batch.length >= BATCH_SIZE) {
-            await upsertBatch(admin, batch);
-            totalSynced += batch.length;
-            batch = [];
-            if (totalSynced % 5000 === 0) {
-              console.log(`[sync] progress: ${totalSynced} synced, ${totalSkipped} skipped`);
+        if (inQuotes) {
+          if (c === '"') {
+            if (i + 1 < chunk.length && chunk[i + 1] === '"') {
+              field.push('"');
+              i++; // skip escaped quote
+            } else {
+              inQuotes = false;
             }
+          } else {
+            field.push(c);
           }
+          continue;
         }
+
+        if (c === '"') {
+          inQuotes = true;
+          continue;
+        }
+
+        if (c === ",") {
+          row.push(field.join(""));
+          field.length = 0;
+          continue;
+        }
+
+        if (c === "\n") {
+          flushRow();
+          // 检查是否需要 flush batch（在 flushRow 中计数了）
+          if (batch.length >= BATCH_SIZE) {
+            await flushBatch();
+          }
+          continue;
+        }
+
+        // \r 忽略（\r\n 时 \n 会触发 flush）
+        if (c === "\r") continue;
+
+        field.push(c);
       }
 
-      // 截断已处理部分
-      buffer = buffer.slice(prevIdx);
+      if (done) break;
+    }
 
-      // 限制 buffer 大小防止跨行泄漏（跨行字段安全兜底）
-      if (buffer.length > 1024 * 1024) {
-        console.warn("[sync] buffer exceeded 1MB, resetting (possible corrupt line)");
-        buffer = "";
-      }
+    // 处理最后一行（无换行结尾）
+    if (field.length > 0 || row.length > 0) {
+      flushRow();
+    }
+
+    // 最后一批
+    if (batch.length > 0) {
+      totalSynced += batch.length;
+      await flushBatch();
     }
 
     return json({
@@ -217,61 +234,10 @@ Deno.serve(async (req) => {
   }
 });
 
-/**
- * 解析单行 CSV（处理引号内的逗号/换行）
- * 注：这里假设单行内引号已闭合（上层已做完整性检查）
- */
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  let i = 0;
-
-  while (i < line.length) {
-    const c = line[i];
-
-    if (inQuotes) {
-      if (c === '"') {
-        if (i + 1 < line.length && line[i + 1] === '"') {
-          field += '"';
-          i += 2;
-          continue;
-        }
-        inQuotes = false;
-        i++;
-        continue;
-      }
-      field += c;
-      i++;
-      continue;
-    }
-
-    if (c === '"') {
-      inQuotes = true;
-      i++;
-      continue;
-    }
-
-    if (c === ",") {
-      fields.push(field);
-      field = "";
-      i++;
-      continue;
-    }
-
-    field += c;
-    i++;
-  }
-
-  fields.push(field);
-  return fields;
-}
-
 async function upsertBatch(admin: any, batch: any[]) {
   const { error } = await admin
     .from("gutenberg_catalog")
     .upsert(batch, { onConflict: "gutenberg_id" });
-
   if (error) {
     console.error("[sync] batch upsert error:", error.message);
     throw error;
