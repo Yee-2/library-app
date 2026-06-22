@@ -13,12 +13,19 @@ import { loadEpubJs, loadPdfJs } from '@/composables/reader/lazyImport'
 import { escapeHtml } from '@/lib/reader/escapeHtml'
 import { detectTxtChapters } from '@/lib/reader/chapterRegex'
 import { calcTxtPageSize } from '@/lib/reader/pageSize'
+import { useReaderHeartbeat } from '@/composables/useReaderHeartbeat'
 
 const route = useRoute()
 const router = useRouter()
 const reader = useReaderStore()
 const ach = useAchievementsStore()
 const bookId = computed(() => route.params.id as string)
+
+// 心跳（每 30s 上报一次估算阅读时长；标签页隐藏时暂停）
+useReaderHeartbeat({
+  getBookId: () => bookId.value,
+  getProgressPct: () => progressPct.value,
+})
 
 const book = ref<Book | null>(null)
 const fileUrl = ref<string>('')
@@ -56,66 +63,10 @@ const ttsIndex = ref(0)
 let progressTimer: any
 let onResize: (() => void) | null = null
 
-// 心跳：估算本次阅读时长（秒），并上报
-function reportHeartbeat() {
-  if (!bookId.value) return
-  const now = Date.now()
-  const last = ach.lastHeartbeat || now
-  const seconds = Math.max(0, Math.min(600, Math.round((now - last) / 1000)))
-  if (seconds > 0) {
-    const wordsRead = Math.max(1, Math.round(progressPct.value * 5 / Math.max(1, seconds)))
-    ach.heartbeat(bookId.value, wordsRead).catch((e: any) => {
-      if (import.meta.env.DEV) console.warn('heartbeat failed', e)
-    })
-  }
-  ach.lastHeartbeat = now
-}
-
-let heartbeatTimer: any = null
-let visibilityHandler: (() => void) | null = null
-
-function onVisibilityChange() {
-  if (document.visibilityState === 'hidden') {
-    if (heartbeatTimer) {
-      clearInterval(heartbeatTimer)
-      heartbeatTimer = null
-    }
-  } else {
-    if (!heartbeatTimer) {
-      heartbeatTimer = setInterval(reportHeartbeat, 30_000)
-    }
-  }
-  // 基准 ach.lastHeartbeat 保持不变；
-  // reportHeartbeat 内部已有 Math.min(600, ...) 上限
-}
-
-function startHeartbeatLoop() {
-  if (heartbeatTimer) return
-  heartbeatTimer = setInterval(reportHeartbeat, 30_000)
-  visibilityHandler = onVisibilityChange
-  document.addEventListener('visibilitychange', visibilityHandler)
-}
-
-function stopHeartbeatLoop() {
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer)
-    heartbeatTimer = null
-  }
-  if (visibilityHandler) {
-    document.removeEventListener('visibilitychange', visibilityHandler)
-    visibilityHandler = null
-  }
-  // 退出时立即上报剩余阅读时长
-  reportHeartbeat()
-}
-
 onMounted(async () => {
   try {
     onResize = () => { try { epubRendition?.resize() } catch {} }
     window.addEventListener('resize', onResize)
-
-    // 启动独立心跳（必须在加载书籍前启动，确保切书时也记录）
-    startHeartbeatLoop()
 
     await ach.init()
     ach.checkAll()
@@ -646,8 +597,6 @@ onBeforeUnmount(() => {
   if (epubRendition) { try { epubRendition.destroy() } catch {} }
   if (epubBook) { try { epubBook.destroy() } catch {} }
   if (epubBlobUrl) { URL.revokeObjectURL(epubBlobUrl); epubBlobUrl = null }
-  // 退出时立即上报剩余阅读时长（stopHeartbeatLoop 内部会调用 reportHeartbeat）
-  stopHeartbeatLoop()
   stopTTS()
 })
 
