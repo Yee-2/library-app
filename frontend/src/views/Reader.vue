@@ -63,7 +63,7 @@ function reportHeartbeat() {
   if (seconds > 0) {
     const wordsRead = Math.max(1, Math.round(progressPct.value * 5 / Math.max(1, seconds)))
     ach.heartbeat(bookId.value, wordsRead).catch((e: any) => {
-      console.warn('[reader] heartbeat failed', e)
+      if (import.meta.env.DEV) console.warn('heartbeat failed', e)
     })
   }
   ach.lastHeartbeat = now
@@ -137,7 +137,7 @@ onMounted(async () => {
     loading.value = false
     await renderReader()
   } catch (e: any) {
-    console.error('[reader] onMounted caught:', e)
+    if (import.meta.env.DEV) console.error('onMounted caught:', e)
     error.value = e.message ?? String(e)
   } finally {
     loading.value = false
@@ -198,7 +198,7 @@ async function renderReader() {
     await new Promise(r => requestAnimationFrame(r))
   }
   if (!readerRef.value) {
-    console.error('[reader] readerRef still null, abort render')
+    if (import.meta.env.DEV) console.error('readerRef still null, abort render')
     error.value = '阅读器容器未就绪'
     return
   }
@@ -217,7 +217,7 @@ async function renderReader() {
       error.value = '暂不支持的格式: ' + format
     }
   } catch (e: any) {
-    console.error('[reader] renderReader caught:', e)
+    if (import.meta.env.DEV) console.error('renderReader caught:', e)
     error.value = e?.message ?? String(e)
   }
 }
@@ -309,8 +309,8 @@ function gotoEpubChapter(ch: { cfi?: string; id?: string }) {
 
 function txtPrev() { if (txtPage.value > 0) { txtSlideDir.value = 'prev'; txtPage.value--; applyTxtPage(); txtSlideDir.value = '' } }
 function txtNext() { if (txtPage.value < txtTotalPages.value - 1) { txtSlideDir.value = 'next'; txtPage.value++; applyTxtPage(); txtSlideDir.value = '' } }
-function epubPrev() { try { epubRendition?.prev() } catch (e) { console.error(e) } }
-function epubNext() { try { epubRendition?.next() } catch (e) { console.error(e) } }
+function epubPrev() { try { epubRendition?.prev() } catch (e) { if (import.meta.env.DEV) console.error(e) } }
+function epubNext() { try { epubRendition?.next() } catch (e) { if (import.meta.env.DEV) console.error(e) } }
 function prevPage() {
   if (!book.value) return
   if (book.value.file_format === 'epub') epubPrev()
@@ -383,7 +383,7 @@ async function renderEpub() {
     if (!res.ok) throw new Error('fetch epub failed: ' + res.status)
     bookInput = await res.arrayBuffer()
   } catch (e) {
-    console.error('[reader] epub download failed, falling back to URL', e)
+    if (import.meta.env.DEV) console.error('epub download failed, falling back to URL', e)
     bookInput = fileUrl.value
   }
 
@@ -406,7 +406,7 @@ async function renderEpub() {
   // 字号
   rendition.themes.fontSize(`${reader.fontSize}px`)
 
-  epubJsBook.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
+  epubJsBook.on?.('openFailed', (e: any) => { if (import.meta.env.DEV) console.error('book openFailed', e) })
 
   // 翻页：键盘左右（外部 window 监听，用于非 epub 格式也生效）
   if (epubKeyHandler) window.removeEventListener('keydown', epubKeyHandler)
@@ -453,7 +453,7 @@ async function renderEpub() {
         if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { epubRendition?.next(); e.preventDefault() }
       })
     } catch (err) {
-      console.warn('[reader] iframe hook registration failed', err)
+      if (import.meta.env.DEV) console.warn('iframe hook registration failed', err)
     }
   })
 
@@ -463,14 +463,14 @@ async function renderEpub() {
       new Promise((_, rej) => setTimeout(() => rej(new Error('book.ready timeout 15s')), 15000)),
     ])
   } catch (e) {
-    console.error('[reader]', e)
+    if (import.meta.env.DEV) console.error(e)
   }
 
   const saved = await getProgress(bookId.value)
   try {
     await rendition.display(saved?.cfi || undefined)
   } catch (e) {
-    console.error('[reader] display error', e)
+    if (import.meta.env.DEV) console.error('display error', e)
   }
 
   // 异步生成 location（必须在 display() 之后，否则会破坏 layout 导致 view 高度变 0）
@@ -481,7 +481,7 @@ async function renderEpub() {
       epubCurrentPage.value = Math.max(1, Math.round(progressPct.value / 100 * epubTotalPages.value))
     }
   }).catch((e: any) => {
-    console.warn('[reader] locations.generate failed', e)
+    if (import.meta.env.DEV) console.warn('locations.generate failed', e)
   })
 
   await nextTick()
@@ -498,7 +498,7 @@ async function renderEpub() {
       cfi: item.href || undefined,
     }))
   } catch (e) {
-    console.error('[reader] toc failed', e)
+    if (import.meta.env.DEV) console.error('toc failed', e)
   }
   rendition.on('relocated', (loc: any) => {
     // paginated 模式用 percentageFromCfi 计算进度
@@ -693,7 +693,7 @@ async function startTTS() {
         text = (contents.window.document.body.textContent || '').slice(0, 5000)
       }
     } catch (e) {
-      console.warn('[tts] epub text extraction failed', e)
+      if (import.meta.env.DEV) console.warn('epub text extraction failed', e)
     }
     if (!text) text = '当前章节无法提取文本'
   } else if (book.value?.file_format === 'pdf') {
