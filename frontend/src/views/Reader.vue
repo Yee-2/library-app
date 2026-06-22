@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { getBook, getMyBookFileUrl, fetchOnlineBookFile, checkIsGutenbergBook, checkIsWikisourceBook, fetchWikisourceBookFile, upsertProgress, getProgress, listBookmarks, addBookmark, deleteBookmark, listNotes, addNote, deleteNote, reportReadingHeartbeat } from '@/lib/books'
+import { getBook, getMyBookFileUrl, fetchOnlineBookFile, checkIsGutenbergBook, checkIsWikisourceBook, fetchWikisourceBookFile, upsertProgress, getProgress, addBookmark, addNote, reportReadingHeartbeat } from '@/lib/books'
 import { toast } from '@/lib/toast'
 import { useReaderStore } from '@/stores/reader'
 import { ttsSynthesize, splitSentences, extractPdfText } from '@/lib/tts'
 import { useAchievementsStore } from '@/stores/achievements'
 import { FONT_OPTIONS, THEME_OPTIONS, TTS_VOICES } from '@/types'
 import { ListTree, Bookmark as BookmarkIcon, NotebookPen, Volume2, Settings, Pause, Play, Square, RefreshCw, X, ArrowLeft } from 'lucide-vue-next'
-import type { Book, Bookmark, Note } from '@/types'
+import type { Book, Bookmark } from '@/types'
 import { loadEpubJs, loadPdfJs } from '@/composables/reader/lazyImport'
 import { escapeHtml } from '@/lib/reader/escapeHtml'
 import { detectTxtChapters } from '@/lib/reader/chapterRegex'
 import { calcTxtPageSize } from '@/lib/reader/pageSize'
 import { useReaderHeartbeat } from '@/composables/useReaderHeartbeat'
+import { useBookSideData } from '@/composables/useBookSideData'
 
 const route = useRoute()
 const router = useRouter()
@@ -46,9 +47,8 @@ const pageInputValue = ref(1)
 const pageInputRef = ref<HTMLInputElement | null>(null)
 
 // 笔记 / 书签
-const bookmarks = ref<Bookmark[]>([])
-const notes = ref<Note[]>([])
-const newNoteText = ref('')
+const sideData = useBookSideData({ getBookId: () => bookId.value })
+const { bookmarks, notes, newNoteText, load: loadSideData, removeBookmark, removeNote } = sideData
 
 // TTS
 const ttsPlaying = ref(false)
@@ -132,12 +132,6 @@ onBeforeUnmount(() => {
 async function currentUserId() {
   const { data } = await (await import('@/lib/supabase')).supabase.auth.getUser()
   return data.user?.id
-}
-
-async function loadSideData() {
-  const [b, n] = await Promise.all([listBookmarks(bookId.value), listNotes(bookId.value)])
-  bookmarks.value = b
-  notes.value = n
 }
 
 // =============== 阅读器核心 ===============
@@ -828,11 +822,6 @@ async function gotoBookmark(b: Bookmark) {
     }
   }
 }
-async function removeBookmark(id: string) {
-  await deleteBookmark(id)
-  bookmarks.value = bookmarks.value.filter((b: Bookmark) => b.id !== id)
-}
-
 // =============== 笔记 ===============
 async function addNoteManual() {
   if (!newNoteText.value.trim()) return
@@ -846,10 +835,6 @@ async function addNoteManual() {
   })
   notes.value.unshift(n)
   newNoteText.value = ''
-}
-async function removeNote(id: string) {
-  await deleteNote(id)
-  notes.value = notes.value.filter(n => n.id !== id)
 }
 
 // 键盘翻页
