@@ -84,7 +84,6 @@ function stopHeartbeatLoop() {
 }
 
 onMounted(async () => {
-  console.log('[reader] onMounted, bookId =', bookId.value)
   try {
     onResize = () => { try { epubRendition?.resize() } catch {} }
     window.addEventListener('resize', onResize)
@@ -96,10 +95,8 @@ onMounted(async () => {
     ach.checkAll()
     ach.lastHeartbeat = Date.now()  // init 完成后才设置基准时间，避免首次上报巨大数值
     const loaded = await getBook(bookId.value)
-    console.log('[reader] loaded book, format =', loaded?.file_format, 'file_url =', loaded?.file_url)
     book.value = loaded
     const me = await currentUserId()
-    console.log('[reader] currentUserId =', me, 'book.user_id =', loaded?.user_id, 'match =', loaded?.user_id === me)
     if (me && loaded.user_id !== me && !loaded.is_public) {
       error.value = '无权访问此书（此书属于其他用户）'
       return
@@ -108,7 +105,6 @@ onMounted(async () => {
     // 检测是否古登堡在线书
     const gbInfo = await checkIsGutenbergBook(bookId.value)
     if (gbInfo?.isGutenberg) {
-      console.log('[reader] detected gutenberg book, gutenberg_id =', gbInfo.gutenberg_id)
       isOnlineBook.value = true
       // 用 gutenberg-fetch 拿 blob URL（已包含 epub/txt 完整文件）
       const online = await fetchOnlineBookFile(bookId.value)
@@ -123,7 +119,6 @@ onMounted(async () => {
       // 检测是否维基文库在线书
       const wsInfo = await checkIsWikisourceBook(bookId.value)
       if (wsInfo?.isWikisource) {
-        console.log('[reader] detected wikisource book, page =', wsInfo.page_title)
         isOnlineBook.value = true
         const data = await fetchWikisourceBookFile(bookId.value)
         // 维基文库返回纯文本，创建 txt blob
@@ -133,17 +128,14 @@ onMounted(async () => {
         loaded.file_format = 'txt'
         book.value = { ...loaded, file_format: 'txt' }
       } else {
-        console.log('[reader] creating signed url...')
         fileUrl.value = await getMyBookFileUrl(loaded)
       }
     }
-    console.log('[reader] fileUrl =', fileUrl.value.slice(0, 80) + '...')
 
     await loadSideData()
     // 关键：先翻 loading=false 让 <div ref="readerRef"> 挂上 DOM，再 renderReader
     loading.value = false
     await renderReader()
-    console.log('[reader] renderReader finished')
   } catch (e: any) {
     console.error('[reader] onMounted caught:', e)
     error.value = e.message ?? String(e)
@@ -210,26 +202,20 @@ async function renderReader() {
     error.value = '阅读器容器未就绪'
     return
   }
-  console.log('[reader] renderReader start, format =', book.value?.file_format, 'el =', readerRef.value.tagName, readerRef.value.clientWidth, 'x', readerRef.value.clientHeight)
   // 应用阅读偏好
   reader.applyTo(readerRef.value)
 
   const format = book.value!.file_format
   try {
     if (format === 'txt') {
-      console.log('[reader] -> renderTxt')
       await renderTxt()
     } else if (format === 'epub') {
-      console.log('[reader] -> renderEpub')
       await renderEpub()
     } else if (format === 'pdf') {
-      console.log('[reader] -> renderPdf')
       await renderPdf()
     } else {
-      console.log('[reader] -> unsupported format:', format)
       error.value = '暂不支持的格式: ' + format
     }
-    console.log('[reader] renderReader complete')
   } catch (e: any) {
     console.error('[reader] renderReader caught:', e)
     error.value = e?.message ?? String(e)
@@ -244,7 +230,6 @@ async function renderTxt() {
   }
   const buf = await res.arrayBuffer()
   const text = new TextDecoder('utf-8', { fatal: false }).decode(buf)
-  console.log('[reader] txt decoded length =', text.length, 'bytes =', buf.byteLength)
   txtContent.value = text
   const pageSize = calcTxtPageSize()
   txtTotalPages.value = Math.max(1, Math.ceil(text.length / pageSize))
@@ -261,7 +246,6 @@ async function renderTxt() {
     charPos += rawLines[i].length + 1
   }
   chapters.value = found
-  console.log('[reader] txt chapters detected =', found.length, 'pageSize =', pageSize)
 
   const prog = await getProgress(bookId.value)
   if (prog?.page) {
@@ -398,7 +382,6 @@ async function renderEpub() {
     const res = await fetch(fileUrl.value)
     if (!res.ok) throw new Error('fetch epub failed: ' + res.status)
     bookInput = await res.arrayBuffer()
-    console.log('[reader] epub fetched, bytes =', (bookInput as ArrayBuffer).byteLength)
   } catch (e) {
     console.error('[reader] epub download failed, falling back to URL', e)
     bookInput = fileUrl.value
@@ -424,7 +407,6 @@ async function renderEpub() {
   rendition.themes.fontSize(`${reader.fontSize}px`)
 
   epubJsBook.on?.('openFailed', (e: any) => console.error('[reader] book openFailed', e))
-  epubJsBook.on?.('closed', () => console.log('[reader] book closed'))
 
   // 翻页：键盘左右（外部 window 监听，用于非 epub 格式也生效）
   if (epubKeyHandler) window.removeEventListener('keydown', epubKeyHandler)
@@ -487,7 +469,6 @@ async function renderEpub() {
   const saved = await getProgress(bookId.value)
   try {
     await rendition.display(saved?.cfi || undefined)
-    console.log('[reader] display done')
   } catch (e) {
     console.error('[reader] display error', e)
   }
@@ -495,7 +476,6 @@ async function renderEpub() {
   // 异步生成 location（必须在 display() 之后，否则会破坏 layout 导致 view 高度变 0）
   epubJsBook.locations.generate(1024).then(() => {
     epubTotalPages.value = epubJsBook.locations.length()
-    console.log('[reader] locations generated, total pages =', epubTotalPages.value)
     // 重新计算当前页码
     if (epubTotalPages.value > 0) {
       epubCurrentPage.value = Math.max(1, Math.round(progressPct.value / 100 * epubTotalPages.value))
@@ -517,7 +497,6 @@ async function renderEpub() {
       label: item.label || '(无标题)',
       cfi: item.href || undefined,
     }))
-    console.log('[reader] epub chapters =', chapters.value.length)
   } catch (e) {
     console.error('[reader] toc failed', e)
   }
