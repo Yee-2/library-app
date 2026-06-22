@@ -9,6 +9,7 @@ import { useAchievementsStore } from '@/stores/achievements'
 import { FONT_OPTIONS, THEME_OPTIONS, TTS_VOICES } from '@/types'
 import { ListTree, Bookmark as BookmarkIcon, NotebookPen, Volume2, Settings, Pause, Play, Square, RefreshCw, X, ArrowLeft } from 'lucide-vue-next'
 import type { Book, Bookmark, Note } from '@/types'
+import { loadEpubJs } from '@/composables/reader/lazyImport'
 
 const route = useRoute()
 const router = useRouter()
@@ -378,7 +379,7 @@ function detachSwipeListeners() {
 }
 async function renderEpub() {
   // 动态导入 epubjs
-  const ePub = (await import('epubjs')).default
+  const ePub = await loadEpubJs()
   if (epubRendition) {
     try { epubRendition.destroy() } catch {}
     epubRendition = null
