@@ -9,7 +9,7 @@ import { useAchievementsStore } from '@/stores/achievements'
 import { FONT_OPTIONS, THEME_OPTIONS, TTS_VOICES } from '@/types'
 import { ListTree, Bookmark as BookmarkIcon, NotebookPen, Volume2, Settings, Pause, Play, Square, RefreshCw, X, ArrowLeft } from 'lucide-vue-next'
 import type { Book, Bookmark, Note } from '@/types'
-import { loadEpubJs } from '@/composables/reader/lazyImport'
+import { loadEpubJs, loadPdfJs } from '@/composables/reader/lazyImport'
 
 const route = useRoute()
 const router = useRouter()
@@ -547,10 +547,7 @@ async function renderEpub() {
 }
 
 async function renderPdf() {
-  const pdfjs = await import('pdfjs-dist')
-  // 动态设置 worker（Vite import）
-  const workerUrl = (await import('pdfjs-dist/build/pdf.worker.mjs?url')).default
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+  const pdfjs = await loadPdfJs()
 
   const loadingTask = pdfjs.getDocument(fileUrl.value)
   const pdf = await loadingTask.promise
