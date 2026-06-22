@@ -10,11 +10,10 @@ import { FONT_OPTIONS, THEME_OPTIONS, TTS_VOICES } from '@/types'
 import { ListTree, Bookmark as BookmarkIcon, NotebookPen, Volume2, Settings, Pause, Play, Square, RefreshCw, X, ArrowLeft } from 'lucide-vue-next'
 import type { Book, Bookmark } from '@/types'
 import { loadEpubJs, loadPdfJs } from '@/composables/reader/lazyImport'
-import { escapeHtml } from '@/lib/reader/escapeHtml'
-import { detectTxtChapters } from '@/lib/reader/chapterRegex'
 import { calcTxtPageSize } from '@/lib/reader/pageSize'
 import { useReaderHeartbeat } from '@/composables/useReaderHeartbeat'
 import { useBookSideData } from '@/composables/useBookSideData'
+import { useTxtReader } from '@/composables/useTxtReader'
 
 const route = useRoute()
 const router = useRouter()
@@ -136,11 +135,7 @@ async function currentUserId() {
 
 // =============== 阅读器核心 ===============
 const readerRef = ref<HTMLElement | null>(null)
-const txtContent = ref('')
-const txtPage = ref(0)
-const txtTotalPages = ref(1)
 const progressPct = ref(0)
-const txtSlideDir = ref<'next' | 'prev' | ''>('')  // 翻页动画方向
 const epubCurrentPage = ref(0)
 const epubTotalPages = ref(0)
 
@@ -149,6 +144,18 @@ const epubTotalPages = ref(0)
 // 目录：epub 从 navigation.toc 拿，txt 从正则识别章节标题
 const chapters = ref<Array<{ id: string; label: string; cfi?: string; index?: number }>>([])
 const showToc = ref(false)
+
+// TXT 阅读器
+const txt = useTxtReader({
+  getBookId: () => bookId.value,
+  getFileUrl: () => fileUrl.value,
+  getReaderRef: () => readerRef.value,
+  onProgressChange: (pct) => { progressPct.value = pct },
+  onChapters: (ch) => { chapters.value = ch as any },
+})
+// 模板直接用 txt.txtPage 无法自动解包 — 暴露顶层别名（与 composable 共享同一 Ref）
+const txtPage = txt.txtPage
+const txtTotalPages = txt.txtTotalPages
 
 async function renderReader() {
   // 等 readerRef 真正挂到 DOM 上 —— onMounted 翻 loading=false 后，v-else 分支的
@@ -169,7 +176,7 @@ async function renderReader() {
   const format = book.value!.file_format
   try {
     if (format === 'txt') {
-      await renderTxt()
+      await txt.render()
     } else if (format === 'epub') {
       await renderEpub()
     } else if (format === 'pdf') {
@@ -183,63 +190,9 @@ async function renderReader() {
   }
 }
 
-async function renderTxt() {
-  const res = await fetch(fileUrl.value)
-  if (!res.ok) {
-    error.value = '下载失败：HTTP ' + res.status
-    return
-  }
-  const buf = await res.arrayBuffer()
-  const text = new TextDecoder('utf-8', { fatal: false }).decode(buf)
-  txtContent.value = text
-  const pageSize = calcTxtPageSize(readerRef.value)
-  txtTotalPages.value = Math.max(1, Math.ceil(text.length / pageSize))
-
-  // 自动识别章节标题
-  chapters.value = detectTxtChapters(text)
-
-  const prog = await getProgress(bookId.value)
-  if (prog?.page) {
-    txtPage.value = Math.min(prog.page, txtTotalPages.value - 1)
-  } else {
-    txtPage.value = 0
-  }
-  applyTxtPage()
-}
-
-function applyTxtPage() {
-  if (!readerRef.value) return
-  const pageSize = calcTxtPageSize(readerRef.value)
-  const start = txtPage.value * pageSize
-  let slice = txtContent.value.slice(start, start + pageSize)
-  // 向下找下一个空行结尾，避免切到半行
-  const nextBreak = slice.indexOf('\n\n', Math.max(0, slice.length - 300))
-  if (nextBreak > 0 && txtPage.value < txtTotalPages.value - 1) {
-    slice = slice.slice(0, nextBreak)
-  }
-  readerRef.value.innerHTML = slice
-    .split(/\n\s*\n/)
-    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
-    .join('')
-  // 触发翻页动画
-  if (txtSlideDir.value) {
-    readerRef.value.classList.remove('page-turn-next', 'page-turn-prev')
-    // 强制 reflow 让动画重新触发
-    void readerRef.value.offsetWidth
-    readerRef.value.classList.add(txtSlideDir.value === 'next' ? 'page-turn-next' : 'page-turn-prev')
-  }
-  // 重新计算总页数（因为 pageSize 可能变化）
-  txtTotalPages.value = Math.max(1, Math.ceil(txtContent.value.length / pageSize))
-  progressPct.value = ((txtPage.value + 1) / txtTotalPages.value) * 100
-  scheduleSaveProgress()
-}
-
 // 跳转到 txt 章节（按字符位置换算到对应 page）
-let jumpToChapter = (index: number) => {
-  const ch = chapters.value.find(c => c.index === index)
-  if (!ch) return
-  txtPage.value = Math.max(0, Math.floor((ch.index ?? 0) / calcTxtPageSize(readerRef.value)))
-  applyTxtPage()
+function jumpToTxtChapter(index: number) {
+  txt.jumpToChapter(index)
   showToc.value = false
 }
 
@@ -258,21 +211,45 @@ function gotoEpubChapter(ch: { cfi?: string; id?: string }) {
   showToc.value = false
 }
 
-function txtPrev() { if (txtPage.value > 0) { txtSlideDir.value = 'prev'; txtPage.value--; applyTxtPage(); txtSlideDir.value = '' } }
-function txtNext() { if (txtPage.value < txtTotalPages.value - 1) { txtSlideDir.value = 'next'; txtPage.value++; applyTxtPage(); txtSlideDir.value = '' } }
+// 跳转到 pdf 章节（按页码）
+function jumpToPdfChapter(index: number) {
+  const pdf = (readerRef.value as any)?.__pdf
+  if (!pdf) return
+  const page = index + 1
+  ;(readerRef.value as any).__currentPage = page
+  txt.txtPage.value = page - 1
+  renderPdfPage(pdf, page)
+  progressPct.value = (page / pdf.numPages) * 100
+  scheduleSaveProgress(undefined, page)
+  showToc.value = false
+}
+
+// 统一目录跳转（epub / pdf / txt 分支）
+function jumpToChapter(index: number) {
+  const fmt = book.value?.file_format
+  if (fmt === 'epub') {
+    const ch = chapters.value[index]
+    if (ch) gotoEpubChapter(ch)
+  } else if (fmt === 'pdf') {
+    jumpToPdfChapter(index)
+  } else if (fmt === 'txt') {
+    jumpToTxtChapter(index)
+  }
+}
+
 function epubPrev() { try { epubRendition?.prev() } catch (e) { if (import.meta.env.DEV) console.error(e) } }
 function epubNext() { try { epubRendition?.next() } catch (e) { if (import.meta.env.DEV) console.error(e) } }
 function prevPage() {
   if (!book.value) return
   if (book.value.file_format === 'epub') epubPrev()
   else if (book.value.file_format === 'pdf') pdfPrev()
-  else txtPrev()
+  else txt.prev()
 }
 function nextPage() {
   if (!book.value) return
   if (book.value.file_format === 'epub') epubNext()
   else if (book.value.file_format === 'pdf') pdfNext()
-  else txtNext()
+  else txt.next()
 }
 
 function jumpToInputPage() {
@@ -283,8 +260,7 @@ function jumpToInputPage() {
     const cfi = epubBook.locations.cfiFromLocation(targetPage - 1)
     if (cfi) epubRendition?.display(cfi)
   } else {
-    txtPage.value = Math.max(0, Math.min(page - 1, txtTotalPages.value - 1))
-    applyTxtPage()
+    txt.jumpToPage(page)
   }
   pageInputVisible.value = false
 }
@@ -483,8 +459,8 @@ async function renderPdf() {
   const total = pdf.numPages
   const prog = await getProgress(bookId.value)
   const startPage = Math.max(1, prog?.page || 1)
-  txtTotalPages.value = total
-  txtPage.value = startPage - 1
+  txt.txtTotalPages.value = total
+  txt.txtPage.value = startPage - 1
 
   // PDF 目录 = 页码 1..n（简单列表）
   const pdfChapters: Array<{ id: string; label: string; index: number }> = []
@@ -492,24 +468,6 @@ async function renderPdf() {
     pdfChapters.push({ id: `pdf-p-${i}`, label: `第 ${i} 页`, index: i - 1 })
   }
   chapters.value = pdfChapters
-
-  // 覆盖跳转函数：pdf 跳到具体页
-  const origJump = jumpToChapter
-  jumpToChapter = (index: number) => {
-    if (book.value?.file_format === 'pdf') {
-      const pdf = (readerRef.value as any)?.__pdf
-      if (!pdf) return
-      const page = index + 1
-      ;(readerRef.value as any).__currentPage = page
-      txtPage.value = page - 1
-      renderPdfPage(pdf, page)
-      progressPct.value = (page / pdf.numPages) * 100
-      scheduleSaveProgress(undefined, page)
-      showToc.value = false
-      return
-    }
-    origJump(index)
-  }
 
   await renderPdfPage(pdf, startPage)
   progressPct.value = (startPage / total) * 100
@@ -540,7 +498,7 @@ function pdfPrev() {
   if (pdf && cur > 1) {
     const np = cur - 1
     ;(readerRef.value as any).__currentPage = np
-    txtPage.value = np - 1
+    txt.txtPage.value = np - 1
     renderPdfPage(pdf, np)
     // 翻页动画
     if (readerRef.value) {
@@ -558,7 +516,7 @@ function pdfNext() {
   if (pdf && cur < pdf.numPages) {
     const np = cur + 1
     ;(readerRef.value as any).__currentPage = np
-    txtPage.value = np - 1
+    txt.txtPage.value = np - 1
     renderPdfPage(pdf, np)
     // 翻页动画
     if (readerRef.value) {
@@ -577,7 +535,7 @@ function scheduleSaveProgress(cfi?: string, page?: number) {
     upsertProgress({
       book_id: bookId.value,
       cfi: cfi || null,
-      page: page ?? (txtPage.value + 1),
+      page: page ?? (txt.txtPage.value + 1),
       percentage: progressPct.value,
     }).catch(() => {})
     // 心跳改由独立定时器驱动（每 30s 一次），不再依赖翻页
@@ -608,14 +566,14 @@ watch([() => reader.fontId, () => reader.fontSize, () => reader.lineHeight, () =
 // =============== TTS ==============
 // 注意：TTS 流程对本地书和古登堡在线书完全一致 ——
 // 不管 fileUrl 是 Supabase signed URL 还是 gutenberg-fetch 返回的 blob URL，
-// renderTxt() 和 renderEpub() 都会把内容加载到前端内存（txtContent / epubBook），
+// renderTxt() 和 renderEpub() 都会把内容加载到前端内存（txt.txtContent / epubBook），
 // TTS 直接从内存取文本。所以在线书无需特殊的 TTS 分支。
 async function startTTS() {
   let text = ''
   if (book.value?.file_format === 'txt') {
     const pageSize = calcTxtPageSize(readerRef.value)
-    const start = txtPage.value * pageSize
-    text = txtContent.value.slice(start, start + pageSize)
+    const start = txt.txtPage.value * pageSize
+    text = txt.txtContent.value.slice(start, start + pageSize)
   } else if (book.value?.file_format === 'epub' && epubRendition) {
     // 优先从 rendition 当前 view 获取 contents（避免 epubCurrentContents 因 view 重建而 stale）
     try {
@@ -703,7 +661,7 @@ async function autoPageAndContinue() {
   // 判断是否最后一页
   let isLast = false
   if (fmt === 'txt') {
-    isLast = txtPage.value >= txtTotalPages.value - 1
+    isLast = txt.txtPage.value >= txt.txtTotalPages.value - 1
   } else if (fmt === 'pdf') {
     const pdf = (readerRef.value as any)?.__pdf
     const cur = (readerRef.value as any)?.__currentPage || 1
@@ -722,7 +680,7 @@ async function autoPageAndContinue() {
   try {
     if (fmt === 'epub') epubNext()
     else if (fmt === 'pdf') pdfNext()
-    else txtNext()
+    else txt.next()
   } catch (e: any) {
     toast.error('翻页失败：' + e.message)
     stopTTS()
@@ -737,8 +695,8 @@ async function autoPageAndContinue() {
   let text = ''
   if (fmt === 'txt') {
     const pageSize = calcTxtPageSize(readerRef.value)
-    const start = txtPage.value * pageSize
-    text = txtContent.value.slice(start, start + pageSize)
+    const start = txt.txtPage.value * pageSize
+    text = txt.txtContent.value.slice(start, start + pageSize)
   } else if (fmt === 'epub') {
     try {
       let contents: any = null
@@ -800,7 +758,7 @@ async function addCurrentBookmark() {
     ? epubRendition.currentLocation().start.cfi
     : null
   const page = book.value.file_format !== 'epub'
-    ? (txtPage.value + 1)
+    ? (txt.txtPage.value + 1)
     : null
   const note = prompt('书签备注（可选）') || null
   const b = await addBookmark({ book_id: bookId.value, cfi, page, note, color: '#facc15' })
@@ -811,13 +769,12 @@ async function gotoBookmark(b: Bookmark) {
   if (b.cfi && epubRendition) {
     await epubRendition.display(b.cfi)
   } else if (b.page && book.value?.file_format === 'txt') {
-    txtPage.value = b.page - 1
-    applyTxtPage()
+    txt.jumpToPage(b.page)
   } else if (b.page && book.value?.file_format === 'pdf') {
     const pdf = (readerRef.value as any)?.__pdf
     if (pdf) {
       ;(readerRef.value as any).__currentPage = b.page
-      txtPage.value = b.page - 1
+      txt.txtPage.value = b.page - 1
       renderPdfPage(pdf, b.page)
     }
   }
@@ -828,7 +785,7 @@ async function addNoteManual() {
   const n = await addNote({
     book_id: bookId.value,
     cfi: epubRendition?.currentLocation?.()?.start?.cfi ?? null,
-    page: book.value?.file_format !== 'epub' ? (txtPage.value + 1) : null,
+    page: book.value?.file_format !== 'epub' ? (txt.txtPage.value + 1) : null,
     content: newNoteText.value.trim(),
     comment: null,
     color: '#fbbf24',
@@ -841,8 +798,8 @@ async function addNoteManual() {
 function onKey(e: KeyboardEvent) {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
   if (book.value?.file_format === 'epub') return // epubjs 自己处理
-  if (e.key === 'ArrowLeft') book.value?.file_format === 'pdf' ? pdfPrev() : txtPrev()
-  else if (e.key === 'ArrowRight') book.value?.file_format === 'pdf' ? pdfNext() : txtNext()
+  if (e.key === 'ArrowLeft') book.value?.file_format === 'pdf' ? pdfPrev() : txt.prev()
+  else if (e.key === 'ArrowRight') book.value?.file_format === 'pdf' ? pdfNext() : txt.next()
 }
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
