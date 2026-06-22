@@ -51,7 +51,6 @@ const ttsIndex = ref(0)
 
 // 阅读进度保存防抖
 let progressTimer: any
-let heartbeatTimer: any           // 独立心跳定时器（与翻页解耦）
 let onResize: (() => void) | null = null
 
 // 心跳：估算本次阅读时长（秒），并上报
@@ -69,9 +68,29 @@ function reportHeartbeat() {
   ach.lastHeartbeat = now
 }
 
+let heartbeatTimer: any = null
+let visibilityHandler: (() => void) | null = null
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'hidden') {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer)
+      heartbeatTimer = null
+    }
+  } else {
+    if (!heartbeatTimer) {
+      heartbeatTimer = setInterval(reportHeartbeat, 30_000)
+    }
+  }
+  // 基准 ach.lastHeartbeat 保持不变；
+  // reportHeartbeat 内部已有 Math.min(600, ...) 上限
+}
+
 function startHeartbeatLoop() {
-  // 每 30 秒上报一次，不论用户是否翻页
+  if (heartbeatTimer) return
   heartbeatTimer = setInterval(reportHeartbeat, 30_000)
+  visibilityHandler = onVisibilityChange
+  document.addEventListener('visibilitychange', visibilityHandler)
 }
 
 function stopHeartbeatLoop() {
@@ -79,7 +98,11 @@ function stopHeartbeatLoop() {
     clearInterval(heartbeatTimer)
     heartbeatTimer = null
   }
-  // 退出时立即上报剩余时长
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler)
+    visibilityHandler = null
+  }
+  // 退出时立即上报剩余阅读时长
   reportHeartbeat()
 }
 
