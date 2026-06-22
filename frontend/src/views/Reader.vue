@@ -10,6 +10,9 @@ import { FONT_OPTIONS, THEME_OPTIONS, TTS_VOICES } from '@/types'
 import { ListTree, Bookmark as BookmarkIcon, NotebookPen, Volume2, Settings, Pause, Play, Square, RefreshCw, X, ArrowLeft } from 'lucide-vue-next'
 import type { Book, Bookmark, Note } from '@/types'
 import { loadEpubJs, loadPdfJs } from '@/composables/reader/lazyImport'
+import { escapeHtml } from '@/lib/reader/escapeHtml'
+import { detectTxtChapters } from '@/lib/reader/chapterRegex'
+import { calcTxtPageSize } from '@/lib/reader/pageSize'
 
 const route = useRoute()
 const router = useRouter()
@@ -196,17 +199,7 @@ const txtSlideDir = ref<'next' | 'prev' | ''>('')  // 翻页动画方向
 const epubCurrentPage = ref(0)
 const epubTotalPages = ref(0)
 
-// 根据视口高度动态计算每页字符数
-function calcTxtPageSize(): number {
-  const vh = readerRef.value?.clientHeight || window.innerHeight - 120
-  // 18px 字号 × 1.8 行高 ≈ 32px/行，20px padding × 2 = 40px
-  const lineHeight = 32  // approx
-  const padding = 48
-  const linesPerPage = Math.floor((vh - padding) / lineHeight)
-  // 中文每行约 18-20 个字符（max-width 720px, 18px font）
-  const charsPerLine = 18
-  return Math.max(300, linesPerPage * charsPerLine)
-}
+// 根据视口高度动态计算每页字符数（已抽取到 lib/reader/pageSize.ts）
 
 // 目录：epub 从 navigation.toc 拿，txt 从正则识别章节标题
 const chapters = ref<Array<{ id: string; label: string; cfi?: string; index?: number }>>([])
@@ -254,21 +247,11 @@ async function renderTxt() {
   const buf = await res.arrayBuffer()
   const text = new TextDecoder('utf-8', { fatal: false }).decode(buf)
   txtContent.value = text
-  const pageSize = calcTxtPageSize()
+  const pageSize = calcTxtPageSize(readerRef.value)
   txtTotalPages.value = Math.max(1, Math.ceil(text.length / pageSize))
 
   // 自动识别章节标题
-  const chRe = /^(?:\s*)(第[\d一-龥一二三四五六七八九十百千零两]+[章节回卷篇集部]|序章|序言|前言|楔子|尾声|番外|后记|Chapter\s+\d+|CHAPTER\s+\d+|CHAPTER\s+[IVX]+)/i
-  const rawLines = text.split(/\r?\n/)
-  const found: Array<{ id: string; label: string; index: number }> = []
-  let charPos = 0
-  for (let i = 0; i < rawLines.length; i++) {
-    if (chRe.test(rawLines[i])) {
-      found.push({ id: 'txt-ch-' + found.length, label: rawLines[i].trim().slice(0, 60), index: charPos })
-    }
-    charPos += rawLines[i].length + 1
-  }
-  chapters.value = found
+  chapters.value = detectTxtChapters(text)
 
   const prog = await getProgress(bookId.value)
   if (prog?.page) {
@@ -281,7 +264,7 @@ async function renderTxt() {
 
 function applyTxtPage() {
   if (!readerRef.value) return
-  const pageSize = calcTxtPageSize()
+  const pageSize = calcTxtPageSize(readerRef.value)
   const start = txtPage.value * pageSize
   let slice = txtContent.value.slice(start, start + pageSize)
   // 向下找下一个空行结尾，避免切到半行
@@ -310,7 +293,7 @@ function applyTxtPage() {
 let jumpToChapter = (index: number) => {
   const ch = chapters.value.find(c => c.index === index)
   if (!ch) return
-  txtPage.value = Math.max(0, Math.floor((ch.index ?? 0) / calcTxtPageSize()))
+  txtPage.value = Math.max(0, Math.floor((ch.index ?? 0) / calcTxtPageSize(readerRef.value)))
   applyTxtPage()
   showToc.value = false
 }
@@ -359,10 +342,6 @@ function jumpToInputPage() {
     applyTxtPage()
   }
   pageInputVisible.value = false
-}
-
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 }
 
 let epubBook: any = null
@@ -691,7 +670,7 @@ watch([() => reader.fontId, () => reader.fontSize, () => reader.lineHeight, () =
 async function startTTS() {
   let text = ''
   if (book.value?.file_format === 'txt') {
-    const pageSize = calcTxtPageSize()
+    const pageSize = calcTxtPageSize(readerRef.value)
     const start = txtPage.value * pageSize
     text = txtContent.value.slice(start, start + pageSize)
   } else if (book.value?.file_format === 'epub' && epubRendition) {
@@ -814,7 +793,7 @@ async function autoPageAndContinue() {
   // 提取新页面文本
   let text = ''
   if (fmt === 'txt') {
-    const pageSize = calcTxtPageSize()
+    const pageSize = calcTxtPageSize(readerRef.value)
     const start = txtPage.value * pageSize
     text = txtContent.value.slice(start, start + pageSize)
   } else if (fmt === 'epub') {
