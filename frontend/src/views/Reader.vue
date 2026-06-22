@@ -6,8 +6,8 @@ import { toast } from '@/lib/toast'
 import { useReaderStore } from '@/stores/reader'
 import { ttsSynthesize, splitSentences, extractPdfText } from '@/lib/tts'
 import { useAchievementsStore } from '@/stores/achievements'
-import { FONT_OPTIONS, THEME_OPTIONS, TTS_VOICES } from '@/types'
-import { ListTree, Bookmark as BookmarkIcon, NotebookPen, Volume2, Settings, Pause, Play, Square, RefreshCw, X, ArrowLeft } from 'lucide-vue-next'
+import { TTS_VOICES } from '@/types'
+import { ListTree, Bookmark as BookmarkIcon, NotebookPen, Volume2, Settings, Pause, Play, Square, ArrowLeft } from 'lucide-vue-next'
 import type { Book, Bookmark } from '@/types'
 import { calcTxtPageSize } from '@/lib/reader/pageSize'
 import { useReaderHeartbeat } from '@/composables/useReaderHeartbeat'
@@ -15,6 +15,11 @@ import { useBookSideData } from '@/composables/useBookSideData'
 import { useTxtReader } from '@/composables/useTxtReader'
 import { useEpubReader } from '@/composables/useEpubReader'
 import { usePdfReader } from '@/composables/usePdfReader'
+import PanelBookmarks from '@/components/reader/PanelBookmarks.vue'
+import PanelNotes from '@/components/reader/PanelNotes.vue'
+import PanelSettings from '@/components/reader/PanelSettings.vue'
+import PanelToc from '@/components/reader/PanelToc.vue'
+import PanelTts from '@/components/reader/PanelTts.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -646,174 +651,40 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     </footer>
 
     <!-- 弹窗：设置（字体/主题/字号） -->
-    <div v-if="showSettings" class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" @click.self="showSettings = false">
-      <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] overflow-auto">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="font-semibold">阅读设置</h3>
-          <button @click="showSettings = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
-        </div>
-
-        <section class="mb-4">
-          <h4 class="text-xs text-ink-300 mb-2">字体</h4>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              v-for="f in FONT_OPTIONS"
-              :key="f.id"
-              @click="reader.setFont(f.id)"
-              :class="['px-3 py-2 rounded border text-sm',
-                       reader.fontId === f.id ? 'border-primary-500 bg-primary-100 text-primary-600' : 'border-primary-200']"
-              :style="{ fontFamily: f.family }"
-            >{{ f.preview }}</button>
-          </div>
-        </section>
-
-        <section class="mb-4">
-          <h4 class="text-xs text-ink-300 mb-2">字号</h4>
-          <div class="flex items-center gap-2">
-            <button @click="reader.zoom(-2)" class="btn-secondary px-3">A-</button>
-            <div class="flex-1 text-center text-sm">{{ reader.fontSize }}px</div>
-            <button @click="reader.zoom(2)" class="btn-secondary px-3">A+</button>
-          </div>
-        </section>
-
-        <section class="mb-4">
-          <h4 class="text-xs text-ink-300 mb-2">行间距</h4>
-          <input type="range" min="1.2" max="2.4" step="0.1" :value="reader.lineHeight"
-                 @input="(e) => reader.setLineHeight(+(e.target as HTMLInputElement).value)" class="w-full" />
-          <div class="text-xs text-ink-300 text-center">{{ reader.lineHeight }}</div>
-        </section>
-
-        <section class="mb-4">
-          <h4 class="text-xs text-ink-300 mb-2">页面宽度</h4>
-          <input type="range" min="480" max="960" step="40" :value="reader.maxWidth"
-                 @input="(e) => reader.setMaxWidth(+(e.target as HTMLInputElement).value)" class="w-full" />
-          <div class="text-xs text-ink-300 text-center">{{ reader.maxWidth }}px</div>
-        </section>
-
-        <section>
-          <h4 class="text-xs text-ink-300 mb-2">主题</h4>
-          <div class="grid grid-cols-4 gap-2">
-            <button
-              v-for="t in THEME_OPTIONS"
-              :key="t.id"
-              @click="reader.setTheme(t.id)"
-              :class="['h-12 rounded border-2',
-                       reader.themeId === t.id ? 'border-primary-500' : 'border-transparent']"
-              :style="{ background: t.bg, color: t.color }"
-            >{{ t.name }}</button>
-          </div>
-        </section>
-      </div>
-    </div>
+    <PanelSettings :open="showSettings"
+      :fontId="reader.fontId" :themeId="reader.themeId"
+      :fontSize="reader.fontSize" :lineHeight="reader.lineHeight" :maxWidth="reader.maxWidth"
+      @close="showSettings = false"
+      @setFont="reader.setFont" @setTheme="reader.setTheme"
+      @zoom="reader.zoom" @setLineHeight="reader.setLineHeight" @setMaxWidth="reader.setMaxWidth" />
 
     <!-- 弹窗：书签 -->
-    <div v-if="showBookmarks" class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" @click.self="showBookmarks = false">
-      <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] flex flex-col">
-        <div class="flex justify-between items-center mb-3">
-          <h3 class="font-semibold">书签 ({{ bookmarks.length }})</h3>
-          <div class="flex items-center gap-2">
-            <button @click="addCurrentBookmark" class="text-primary-600 text-sm">+ 添加当前页</button>
-            <button @click="showBookmarks = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
-          </div>
-        </div>
-        <div class="flex-1 overflow-auto space-y-2">
-          <div v-if="bookmarks.length === 0" class="text-center text-ink-300 py-8 text-sm">暂无书签</div>
-          <div v-for="b in bookmarks" :key="b.id" class="card p-3 flex items-center gap-2">
-            <div class="w-1 self-stretch rounded" :style="{ background: b.color }"></div>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm">{{ b.note || `第 ${b.page} 页` }}</div>
-              <div class="text-xs text-ink-300">{{ new Date(b.created_at).toLocaleString('zh-CN') }}</div>
-            </div>
-            <button @click="gotoBookmark(b)" class="text-primary-600 text-sm">跳转</button>
-            <button @click="removeBookmark(b.id)" class="text-red-500 text-sm">删</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <PanelBookmarks :open="showBookmarks" :bookmarks="bookmarks"
+      @close="showBookmarks = false"
+      @add="addCurrentBookmark"
+      @remove="removeBookmark"
+      @jump="(b) => gotoBookmark(b)" />
 
     <!-- 弹窗：笔记 -->
-    <div v-if="showNotes" class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" @click.self="showNotes = false">
-      <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] flex flex-col">
-        <div class="flex justify-between items-center mb-3">
-          <h3 class="font-semibold">笔记 ({{ notes.length }})</h3>
-          <button @click="showNotes = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
-        </div>
-        <div class="mb-3 flex gap-2">
-          <input v-model="newNoteText" placeholder="添加新笔记…" class="input" @keydown.enter="addNoteManual" />
-          <button @click="addNoteManual" class="btn-primary">添加</button>
-        </div>
-        <div class="flex-1 overflow-auto space-y-2">
-          <div v-if="notes.length === 0" class="text-center text-ink-300 py-6 text-sm">暂无笔记</div>
-          <div v-for="n in notes" :key="n.id" class="card p-3">
-            <div class="text-sm whitespace-pre-wrap">{{ n.content }}</div>
-            <div v-if="n.comment" class="text-xs text-ink-300 mt-1">批注：{{ n.comment }}</div>
-            <div class="flex justify-between items-center mt-2">
-              <span class="text-xs text-ink-300">
-                {{ n.page ? `第 ${n.page} 页` : '当前位置' }} · {{ new Date(n.created_at).toLocaleString('zh-CN') }}
-              </span>
-              <button @click="removeNote(n.id)" class="text-red-500 text-xs">删</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <PanelNotes :open="showNotes" :notes="notes" :newNoteText="newNoteText"
+      @close="showNotes = false"
+      @update:newNoteText="newNoteText = $event"
+      @add="addNoteManual"
+      @remove="removeNote" />
 
     <!-- 弹窗：TTS -->
-    <div v-if="showTTSPanel" class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" @click.self="showTTSPanel = false">
-      <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="font-semibold">AI 听书</h3>
-          <button @click="showTTSPanel = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
-        </div>
-
-        <section class="mb-4">
-          <h4 class="text-xs text-ink-300 mb-2">音色</h4>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              v-for="v in TTS_VOICES"
-              :key="v.id"
-              @click="ttsVoice = v.id; stopTTS(); startTTS()"
-              :class="['px-3 py-2 rounded border text-sm text-left',
-                       ttsVoice === v.id ? 'border-primary-500 bg-primary-100 text-primary-600' : 'border-primary-200']"
-            >{{ v.name }}</button>
-          </div>
-        </section>
-
-        <section class="mb-4">
-          <h4 class="text-xs text-ink-300 mb-2">语速 ({{ ttsSpeed.toFixed(1) }}x)</h4>
-          <input type="range" min="0.5" max="2.0" step="0.1" v-model.number="ttsSpeed" class="w-full"
-                 @change="stopTTS(); startTTS()" />
-        </section>
-
-        <div v-if="ttsPlaying" class="text-xs text-ink-300 mb-3">
-          正在播放 {{ ttsIndex + 1 }} / {{ ttsQueue.length }} 句
-          <div class="h-1 bg-ink-100 rounded mt-1">
-            <div class="h-full bg-primary-1000 rounded transition-all"
-                 :style="{ width: ((ttsIndex + 1) / ttsQueue.length * 100) + '%' }"></div>
-          </div>
-        </div>
-
-        <div class="flex gap-2">
-          <button v-if="!ttsPaused" @click="pauseTTS" :disabled="!ttsPlaying" class="btn-secondary flex-1">
-            <Pause class="w-4 h-4" :stroke-width="1.75" />
-            <span>暂停</span>
-          </button>
-          <button v-else @click="resumeTTS" class="btn-primary flex-1">
-            <Play class="w-4 h-4" :stroke-width="1.75" />
-            <span>继续</span>
-          </button>
-          <button @click="stopTTS" :disabled="!ttsPlaying" class="btn-secondary">
-            <Square class="w-4 h-4" :stroke-width="1.75" />
-            <span>停止</span>
-          </button>
-          <button @click="startTTS" class="btn-primary">
-            <RefreshCw class="w-4 h-4" :stroke-width="1.75" />
-            <span>重新播放</span>
-          </button>
-        </div>
-        <p class="text-xs text-ink-300 mt-3">由 MiniMax M3 TTS 提供支持</p>
-      </div>
-    </div>
+    <PanelTts :open="showTTSPanel"
+      :playing="ttsPlaying" :paused="ttsPaused"
+      :voice="ttsVoice" :speed="ttsSpeed" :voices="TTS_VOICES"
+      :index="ttsIndex" :queueLength="ttsQueue.length"
+      @close="showTTSPanel = false"
+      @play="startTTS"
+      @pause="pauseTTS"
+      @resume="resumeTTS"
+      @stop="stopTTS"
+      @restart="startTTS"
+      @setVoice="(p) => { ttsVoice = p.id; stopTTS(); startTTS() }"
+      @setSpeed="(v) => { ttsSpeed = v }" />
 
     <!-- 迷你播放条 -->
     <transition
@@ -845,23 +716,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     </transition>
 
     <!-- 弹窗：目录 -->
-    <div v-if="showToc" class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" @click.self="showToc = false">
-      <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-5 max-h-[80vh] flex flex-col">
-        <div class="flex justify-between items-center mb-3">
-          <h3 class="font-semibold">目录 ({{ chapters.length }})</h3>
-          <button @click="showToc = false" class="text-ink-300"><X class="w-5 h-5" :stroke-width="1.75" /></button>
-        </div>
-        <div v-if="chapters.length === 0" class="text-center text-ink-300 py-6 text-sm">暂无目录</div>
-        <div class="flex-1 overflow-auto space-y-1">
-          <div v-for="(ch, i) in chapters" :key="ch.id || i"
-               @click="book?.file_format === 'epub' ? epubGotoChapter(ch) : jumpToChapter(ch.index!)"
-               class="card p-3 cursor-pointer hover:bg-ink-100 transition text-sm"
-               :title="ch.label">
-            <div class="truncate">{{ i + 1 }}. {{ ch.label }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <PanelToc :open="showToc" :chapters="chapters"
+      @close="showToc = false"
+      @jump="(ch) => { book?.file_format === 'epub' ? epubGotoChapter(ch) : jumpToChapter(ch.index!) }" />
 
   </div>
 </template>
